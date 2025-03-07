@@ -6,10 +6,11 @@ from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory
 from werkzeug.utils import secure_filename
 from config import Config
-from models import db, Document
+from models import db, Document, Paragraph
 from utils.pdf_extractor import extract_text_from_pdf
 from utils.docx_extractor import extract_text_from_docx
 from utils.excel_exporter import generate_excel_report
+from utils.paragraph_processor import process_paragraphs
 
 
 def create_app(config_class=Config):
@@ -94,14 +95,23 @@ def create_app(config_class=Config):
                         
                         document.extracted_text = text
                         document.status = 'processed'
+                        
+                        # Save the document to get an ID before processing paragraphs
+                        db.session.add(document)
+                        db.session.commit()
+                        
+                        # Process paragraphs
+                        paragraph_count = process_paragraphs(text, document, db.session)
+                        db.session.commit()
+                        
+                        app.logger.info(f"Processed {paragraph_count} paragraphs for {original_filename}")
                         successful_uploads += 1
                     except Exception as e:
                         app.logger.error(f"Error processing file {original_filename}: {str(e)}")
                         document.status = 'error'
                         document.error_message = str(e)
-                    
-                    db.session.add(document)
-                    db.session.commit()
+                        db.session.add(document)
+                        db.session.commit()
                 else:
                     flash(f'Invalid file type for {file.filename}. Only PDF and DOCX files are allowed.', 'error')
             
@@ -122,6 +132,17 @@ def create_app(config_class=Config):
         document = Document.query.get_or_404(id)
         return render_template('view.html', document=document)
     
+    @app.route('/paragraphs')
+    def view_paragraphs():
+        paragraphs = Paragraph.query.all()
+        # Get paragraphs that appear in multiple documents
+        shared_paragraphs = [p for p in paragraphs if len(p.documents) > 1]
+        # Sort by number of documents (most shared first)
+        shared_paragraphs.sort(key=lambda p: len(p.documents), reverse=True)
+        return render_template('paragraphs.html', 
+                               paragraphs=paragraphs, 
+                               shared_paragraphs=shared_paragraphs)
+    
     @app.route('/export')
     def export():
         documents = Document.query.filter_by(status='processed').all()
@@ -138,6 +159,23 @@ def create_app(config_class=Config):
             app.logger.error(f"Error generating Excel report: {str(e)}")
             flash(f'Error generating Excel report: {str(e)}', 'error')
             return redirect(url_for('documents'))
+    
+    @app.route('/export_paragraphs')
+    def export_paragraphs():
+        documents = Document.query.filter_by(status='processed').all()
+        
+        if not documents:
+            flash('No processed documents to export', 'error')
+            return redirect(url_for('view_paragraphs'))
+        
+        try:
+            report_filename = generate_excel_report(documents, app.config['UPLOAD_FOLDER'])
+            flash('Excel report with paragraphs generated successfully', 'success')
+            return redirect(url_for('download_report', filename=report_filename))
+        except Exception as e:
+            app.logger.error(f"Error generating Excel report: {str(e)}")
+            flash(f'Error generating Excel report: {str(e)}', 'error')
+            return redirect(url_for('view_paragraphs'))
     
     @app.route('/download/<filename>')
     def download_report(filename):

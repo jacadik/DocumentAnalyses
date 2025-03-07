@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}Document Details - {{ document.original_filename }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Document Details</h1>
+    <a href="{{ url_for('documents') }}" class="btn btn-secondary">Back to List</a>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header bg-light">
+        <h5 class="card-title mb-0">{{ document.original_filename }}</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <p><strong>ID:</strong> {{ document.id }}</p>
+                <p><strong>Original Filename:</strong> {{ document.original_filename }}</p>
+                <p><strong>Stored Filename:</strong> {{ document.filename }}</p>
+                <p><strong>File Type:</strong> {{ document.file_type.upper() }}</p>
+            </div>
+            <div class="col-md-6">
+                <p><strong>File Size:</strong> {{ (document.file_size / 1024) | round(2) }} KB</p>
+                <p><strong>Upload Date:</strong> {{ document.upload_date.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+                <p>
+                    <strong>Status:</strong> 
+                    {% if document.status == 'processed' %}
+                    <span class="badge bg-success">{{ document.status }}</span>
+                    {% elif document.status == 'error' %}
+                    <span class="badge bg-danger">{{ document.status }}</span>
+                    {% else %}
+                    <span class="badge bg-warning text-dark">{{ document.status }}</span>
+                    {% endif %}
+                </p>
+                {% if document.status == 'error' %}
+                <div class="alert alert-danger">
+                    <strong>Error:</strong> {{ document.error_message }}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if document.status == 'processed' and document.paragraphs %}
+<div class="card mb-4">
+    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Paragraphs ({{ document.paragraphs|length }})</h5>
+        <span class="badge bg-primary">{{ document.paragraphs|length }} paragraphs</span>
+    </div>
+    <div class="card-body">
+        <div class="list-group">
+            {% for paragraph in document.paragraphs %}
+            <div class="list-group-item">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <strong>Paragraph #{{ paragraph.id }}</strong>
+                    {% if paragraph.documents|length > 1 %}
+                    <span class="badge bg-info">
+                        Appears in {{ paragraph.documents|length }} document(s)
+                    </span>
+                    {% else %}
+                    <span class="badge bg-secondary">Unique to this document</span>
+                    {% endif %}
+                </div>
+                <p>{{ paragraph.content }}</p>
+                {% if paragraph.documents|length > 1 %}
+                <div class="mt-2">
+                    <small class="text-muted">Also appears in: 
+                        {% for doc in paragraph.documents %}
+                            {% if doc.id != document.id %}
+                            <a href="{{ url_for('view_document', id=doc.id) }}">{{ doc.original_filename }}</a>{% if not loop.last %}, {% endif %}
+                            {% endif %}
+                        {% endfor %}
+                    </small>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if document.status == 'processed' %}
+<div class="card">
+    <div class="card-header bg-light">
+        <h5 class="mb-0">Full Extracted Text</h5>
+    </div>
+    <div class="card-body">
+        <div class="extracted-text border p-3 bg-light rounded">
+            <pre>{{ document.extracted_text }}</pre>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

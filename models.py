@@ -3,6 +3,12 @@ from flask_sqlalchemy import SQLAlchemy
 
 db = SQLAlchemy()
 
+# Association table for many-to-many relationship between documents and paragraphs
+document_paragraph = db.Table('document_paragraph',
+    db.Column('document_id', db.Integer, db.ForeignKey('document.id'), primary_key=True),
+    db.Column('paragraph_id', db.Integer, db.ForeignKey('paragraph.id'), primary_key=True)
+)
+
 class Document(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     filename = db.Column(db.String(255), nullable=False)  # Stored filename (UUID-based)
@@ -13,6 +19,22 @@ class Document(db.Model):
     extracted_text = db.Column(db.Text, nullable=True)
     status = db.Column(db.String(20), default='pending')  # pending, processed, error
     error_message = db.Column(db.Text, nullable=True)
+    
+    # Many-to-many relationship with paragraphs
+    paragraphs = db.relationship('Paragraph', secondary=document_paragraph, 
+                                back_populates='documents')
 
     def __repr__(self):
         return f'<Document {self.original_filename}>'
+
+class Paragraph(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    content = db.Column(db.Text, nullable=False)
+    hash = db.Column(db.String(64), nullable=False, unique=True)  # For efficient lookups
+    
+    # Many-to-many relationship with documents
+    documents = db.relationship('Document', secondary=document_paragraph, 
+                               back_populates='paragraphs')
+    
+    def __repr__(self):
+        return f'<Paragraph {self.id}>'
