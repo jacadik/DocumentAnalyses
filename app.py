@@ -4,7 +4,7 @@ import json
 import logging
 from logging.handlers import RotatingFileHandler
 from datetime import datetime
-from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory, abort
+from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory, abort, Response
 from werkzeug.utils import secure_filename
 from config import Config
 from models import db, Document, Paragraph, document_paragraph
@@ -96,7 +96,6 @@ def create_app(config_class=Config):
     
     # Ensure necessary directories exist
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-    os.makedirs(app.config['PREVIEW_FOLDER'], exist_ok=True)  # Create preview folder
     os.makedirs(app.config['LOG_FOLDER'], exist_ok=True)
     os.makedirs(os.path.join(os.path.dirname(app.instance_path)), exist_ok=True)
     
@@ -238,23 +237,61 @@ def create_app(config_class=Config):
     
     @app.route('/generate-preview/<int:document_id>/<int:page_number>')
     def generate_preview(document_id, page_number):
-        """Generate or retrieve a preview image for a specific document page."""
+        """Generate a preview image for a specific document page in memory."""
         document = Document.query.get_or_404(document_id)
         
         # Get the file type from preview info
         file_type = document.get_file_type_from_preview_info()
         
-        # Generate the appropriate preview
-        if file_type == 'pdf':
-            preview_filename = generate_page_preview(document, page_number, app.config['PREVIEW_FOLDER'])
-        else:  # Default to docx
-            preview_filename = generate_section_preview(document, page_number, app.config['PREVIEW_FOLDER'])
+        # Get the full path to the document file
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], document.filename)
         
-        if not preview_filename:
+        # Generate the appropriate preview in memory
+        if file_type == 'pdf':
+            img_data, mimetype = generate_page_preview(document, page_number, file_path)
+        else:  # Default to docx
+            img_data, mimetype = generate_section_preview(document, page_number, file_path)
+        
+        if not img_data:
             return abort(404)
             
-        # Redirect to the preview image
-        return redirect(url_for('preview_image', filename=preview_filename))
+        # Return the image data directly
+        return Response(img_data, mimetype=mimetype)
+    
+    # Add a route to handle direct preview requests (legacy compatibility)
+    @app.route('/preview/<path:filename>')
+    def preview_image(filename):
+        """
+        Legacy route to maintain compatibility with existing templates.
+        Now just redirects to generate_preview with appropriate parameters.
+        """
+        # Try to extract document_id and page_number from filename
+        # This is a best-effort conversion from old format to new
+        try:
+            # Expected format example: "document_1_page_2.png"
+            parts = filename.split('_')
+            if len(parts) >= 4:
+                doc_index = parts.index('document') if 'document' in parts else -1
+                page_index = parts.index('page') if 'page' in parts else -1
+                
+                if doc_index >= 0 and page_index >= 0 and doc_index + 1 < len(parts) and page_index + 1 < len(parts):
+                    document_id = int(parts[doc_index + 1])
+                    page_number = int(parts[page_index + 1])
+                    return redirect(url_for('generate_preview', document_id=document_id, page_number=page_number))
+            
+            # If we can't parse the filename, check if it's a base filename without page info
+            # In this case, redirect to page 1
+            # Example: "abc123_preview.png"
+            if '_preview.' in filename:
+                base_filename = filename.split('_preview.')[0]
+                document = Document.query.filter_by(filename=base_filename).first()
+                if document:
+                    return redirect(url_for('generate_preview', document_id=document.id, page_number=1))
+        except Exception as e:
+            app.logger.error(f"Error parsing legacy preview filename {filename}: {str(e)}")
+        
+        # If we can't handle the request, return 404
+        return abort(404)
     
     @app.route('/documents')
     def documents():
@@ -272,21 +309,6 @@ def create_app(config_class=Config):
         # Get the stored filename to delete the physical file later
         filename = document.filename
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        
-        # Delete preview images if they exist
-        preview_info = document.get_preview_info()
-        if preview_info:
-            total_pages = preview_info.get('document_page_count', 0)
-            for page in range(1, total_pages + 1):
-                preview_filename = document.get_preview_filename(page)
-                if preview_filename:
-                    preview_path = os.path.join(app.config['PREVIEW_FOLDER'], preview_filename)
-                    if os.path.exists(preview_path):
-                        try:
-                            os.remove(preview_path)
-                            app.logger.info(f"Deleted preview image: {preview_path}")
-                        except Exception as e:
-                            app.logger.error(f"Error deleting preview image {preview_path}: {str(e)}")
         
         # First, record all paragraphs associated with this document before deletion
         paragraphs_to_check = list(document.paragraphs)
@@ -328,9 +350,8 @@ def create_app(config_class=Config):
             # Count documents for flash message
             document_count = len(documents)
             
-            # Delete all physical files and preview images
+            # Delete all physical files only (no previews to delete)
             deleted_files = 0
-            deleted_previews = 0
             for document in documents:
                 # Delete document file
                 file_path = os.path.join(app.config['UPLOAD_FOLDER'], document.filename)
@@ -341,22 +362,6 @@ def create_app(config_class=Config):
                         app.logger.info(f"Deleted file: {file_path}")
                     except Exception as e:
                         app.logger.error(f"Error deleting file {file_path}: {str(e)}")
-                
-                # Delete preview images
-                preview_info = document.get_preview_info()
-                if preview_info:
-                    total_pages = preview_info.get('document_page_count', 0)
-                    for page in range(1, total_pages + 1):
-                        preview_filename = document.get_preview_filename(page)
-                        if preview_filename:
-                            preview_path = os.path.join(app.config['PREVIEW_FOLDER'], preview_filename)
-                            if os.path.exists(preview_path):
-                                try:
-                                    os.remove(preview_path)
-                                    deleted_previews += 1
-                                    app.logger.info(f"Deleted preview image: {preview_path}")
-                                except Exception as e:
-                                    app.logger.error(f"Error deleting preview image {preview_path}: {str(e)}")
             
             # Get paragraph count for flash message
             paragraph_count = Paragraph.query.count()
@@ -369,8 +374,8 @@ def create_app(config_class=Config):
             
             db.session.commit()
             
-            app.logger.info(f"Deleted all {document_count} documents, {deleted_files} files, {deleted_previews} previews, and {paragraph_count} paragraphs")
-            flash(f'Successfully deleted all {document_count} documents, {deleted_files} files, {deleted_previews} preview images, and {paragraph_count} paragraphs.', 'success')
+            app.logger.info(f"Deleted all {document_count} documents, {deleted_files} files, and {paragraph_count} paragraphs")
+            flash(f'Successfully deleted all {document_count} documents, {deleted_files} files, and {paragraph_count} paragraphs.', 'success')
         except Exception as e:
             db.session.rollback()
             app.logger.error(f"Error deleting all documents: {str(e)}")
@@ -396,11 +401,6 @@ def create_app(config_class=Config):
                             document=document, 
                             current_page=current_page,
                             total_pages=total_pages)
-    
-    # Add a route to serve preview images
-    @app.route('/preview/<filename>')
-    def preview_image(filename):
-        return send_from_directory(app.config['PREVIEW_FOLDER'], filename)
     
     @app.route('/paragraphs')
     def view_paragraphs():

@@ -1,6 +1,7 @@
 import fitz  # PyMuPDF
 import os
 import logging
+import io
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,7 @@ def create_pdf_preview_info(file_path):
         dict: Dictionary containing preview information:
             - 'base_filename': Base filename for previews (without page number)
             - 'document_page_count': Total number of pages in the document
-            - 'preview_format': Format string for previews (e.g., "{base}_page_{page}.png")
+            - 'file_type': Type of file ('pdf')
     """
     try:
         logger.info(f"Creating preview info for PDF: {file_path}")
@@ -47,7 +48,6 @@ def create_pdf_preview_info(file_path):
         preview_info = {
             'base_filename': base_filename,
             'document_page_count': total_doc_pages,
-            'preview_format': "{base}_page_{page}.png",
             'file_type': 'pdf'
         }
         
@@ -57,46 +57,33 @@ def create_pdf_preview_info(file_path):
         logger.error(f"Error creating PDF preview info for {file_path}: {str(e)}")
         return None
 
-def generate_page_preview(document, page_number, preview_dir):
-    """Generate a preview image for a specific page of a PDF document.
+def generate_page_preview(document, page_number, file_path):
+    """Generate a preview image for a specific page of a PDF document in memory.
     
     Args:
         document: Document object
         page_number: Page number to generate (1-based index)
-        preview_dir: Directory to save preview image
+        file_path: Path to the PDF file
         
     Returns:
-        str: Filename of the generated preview image, or None if failed
+        tuple: (bytes, str) - Image data as bytes and mimetype
     """
     try:
         # Get preview info
         preview_info = document.get_preview_info()
         if not preview_info:
             logger.error(f"No preview info found for document ID {document.id}")
-            return None
+            return None, None
             
         # Check if page number is valid
         if page_number < 1 or page_number > preview_info.get('document_page_count', 0):
             logger.error(f"Invalid page number {page_number} for document ID {document.id}")
-            return None
-            
-        # Construct the expected preview filename
-        preview_filename = preview_info['preview_format'].format(
-            base=preview_info['base_filename'],
-            page=page_number
-        )
-        preview_path = os.path.join(preview_dir, preview_filename)
-        
-        # Check if preview already exists
-        if os.path.exists(preview_path):
-            logger.info(f"Preview for page {page_number} already exists at: {preview_path}")
-            return preview_filename
+            return None, None
             
         # Open the PDF document
-        file_path = os.path.join(os.path.dirname(preview_dir), document.filename)
         if not os.path.exists(file_path):
             logger.error(f"Document file not found: {file_path}")
-            return None
+            return None, None
             
         doc = fitz.open(file_path)
         
@@ -108,12 +95,17 @@ def generate_page_preview(document, page_number, preview_dir):
         mat = fitz.Matrix(zoom_factor, zoom_factor)
         pix = page.get_pixmap(matrix=mat, alpha=False)
         
-        # Save the image
-        pix.save(preview_path)
-        logger.info(f"Preview generated for page {page_number} at: {preview_path}")
+        # Save the image to a bytes buffer instead of a file
+        img_bytes = pix.tobytes("png")
+        
+        # Create a BytesIO object from the bytes
+        buffer = io.BytesIO(img_bytes)
+        buffer.seek(0)
+        
+        logger.info(f"Preview generated in memory for page {page_number} of document ID {document.id}")
         
         doc.close()
-        return preview_filename
+        return buffer.getvalue(), "image/png"
     except Exception as e:
         logger.error(f"Error generating page preview: {str(e)}")
-        return None
+        return None, None

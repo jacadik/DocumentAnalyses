@@ -4,6 +4,7 @@ import logging
 from PIL import Image, ImageDraw, ImageFont
 import re
 import math
+import io
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +75,6 @@ def create_docx_preview_info(file_path, estimated_page_count=None):
         preview_info = {
             'base_filename': base_filename,
             'document_page_count': section_count,  # For DOCX, we use sections not actual pages
-            'preview_format': "{base}_section_{page}.png",
             'file_type': 'docx'
         }
         
@@ -83,46 +83,33 @@ def create_docx_preview_info(file_path, estimated_page_count=None):
         logger.error(f"Error creating DOCX preview info for {file_path}: {str(e)}")
         return None
 
-def generate_section_preview(document, section_number, preview_dir):
+def generate_section_preview(document, section_number, file_path):
     """Generate a preview image for a specific section of a DOCX document.
     
     Args:
         document: Document object
         section_number: Section number to generate (1-based index)
-        preview_dir: Directory to save preview image
+        file_path: Path to the DOCX file
         
     Returns:
-        str: Filename of the generated preview image, or None if failed
+        tuple: (bytes, str) - Image data as bytes and mimetype
     """
     try:
         # Get preview info
         preview_info = document.get_preview_info()
         if not preview_info:
             logger.error(f"No preview info found for document ID {document.id}")
-            return None
+            return None, None
             
         # Check if section number is valid
         if section_number < 1 or section_number > preview_info.get('document_page_count', 0):
             logger.error(f"Invalid section number {section_number} for document ID {document.id}")
-            return None
-            
-        # Construct the expected preview filename
-        preview_filename = preview_info['preview_format'].format(
-            base=preview_info['base_filename'],
-            page=section_number
-        )
-        preview_path = os.path.join(preview_dir, preview_filename)
-        
-        # Check if preview already exists
-        if os.path.exists(preview_path):
-            logger.info(f"Preview for section {section_number} already exists at: {preview_path}")
-            return preview_filename
+            return None, None
             
         # Open the DOCX document
-        file_path = os.path.join(os.path.dirname(preview_dir), document.filename)
         if not os.path.exists(file_path):
             logger.error(f"Document file not found: {file_path}")
-            return None
+            return None, None
             
         doc = docx.Document(file_path)
         
@@ -234,11 +221,13 @@ def generate_section_preview(document, section_number, preview_dir):
         draw.rectangle([20, height-70, width-20, height-20], fill='lightblue', outline='black', width=2)
         draw.text((width//2, height-45), "Document Analyzer Preview", fill='black', font=font_small, anchor='mm')
         
-        # Save the image
-        image.save(preview_path)
+        # Save the image to BytesIO buffer instead of a file
+        img_buffer = io.BytesIO()
+        image.save(img_buffer, format='PNG')
+        img_buffer.seek(0)
         
-        logger.info(f"Preview generated for section {section_number} at: {preview_path}")
-        return preview_filename
+        logger.info(f"Preview generated in memory for section {section_number} of document ID {document.id}")
+        return img_buffer.getvalue(), "image/png"
     except Exception as e:
         logger.error(f"Error generating section preview: {str(e)}")
-        return None
+        return None, None
