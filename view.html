@@ -28,10 +28,12 @@
                 <p><strong>Original Filename:</strong> {{ document.original_filename }}</p>
                 <p><strong>Stored Filename:</strong> {{ document.filename }}</p>
                 <p><strong>File Type:</strong> {{ document.file_type.upper() }}</p>
+                <p><strong>Page Count:</strong> {{ document.page_count }} pages</p>
             </div>
             <div class="col-md-6">
                 <p><strong>File Size:</strong> {{ (document.file_size / 1024) | round(2) }} KB</p>
                 <p><strong>Upload Date:</strong> {{ document.upload_date.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+                <p><strong>Paragraph Count:</strong> {{ document.paragraph_count }} paragraphs</p>
                 <p>
                     <strong>Status:</strong> 
                     {% if document.status == 'processed' %}
@@ -161,10 +163,4 @@
         </div>
     </div>
 </div>
-
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Initialize Bootstrap components if needed
-    });
-</script>
 {% endblock %}

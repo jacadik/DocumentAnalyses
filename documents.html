@@ -27,6 +27,8 @@
                 <th>Filename</th>
                 <th>Type</th>
                 <th>Size</th>
+                <th>Pages</th>
+                <th>Paragraphs</th>
                 <th>Upload Date</th>
                 <th>Status</th>
                 <th>Actions</th>
@@ -39,6 +41,8 @@
                 <td>{{ doc.original_filename }}</td>
                 <td>{{ doc.file_type.upper() }}</td>
                 <td>{{ (doc.file_size / 1024) | round(2) }} KB</td>
+                <td>{{ doc.page_count }}</td>
+                <td>{{ doc.paragraph_count }}</td>
                 <td>{{ doc.upload_date.strftime('%Y-%m-%d %H:%M') }}</td>
                 <td>
                     {% if doc.status == 'processed' %}

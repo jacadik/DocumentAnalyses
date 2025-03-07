@@ -19,6 +19,8 @@ class Document(db.Model):
     extracted_text = db.Column(db.Text, nullable=True)
     status = db.Column(db.String(20), default='pending')  # pending, processed, error
     error_message = db.Column(db.Text, nullable=True)
+    page_count = db.Column(db.Integer, default=0)  # Number of pages in the document
+    paragraph_count = db.Column(db.Integer, default=0)  # Number of paragraphs identified
     
     # Many-to-many relationship with paragraphs
     paragraphs = db.relationship('Paragraph', secondary=document_paragraph, 

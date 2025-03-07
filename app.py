@@ -6,7 +6,7 @@ from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory
 from werkzeug.utils import secure_filename
 from config import Config
-from models import db, Document, Paragraph, document_paragraph  # Added document_paragraph import
+from models import db, Document, Paragraph, document_paragraph
 from utils.pdf_extractor import extract_text_from_pdf
 from utils.docx_extractor import extract_text_from_docx
 from utils.excel_exporter import generate_excel_report
@@ -38,6 +38,23 @@ def create_app(config_class=Config):
         app.logger.info('Document Analyzer starting up')
     
     with app.app_context():
+        # Add new columns to the existing database table if they don't exist
+        try:
+            db.session.execute(db.text("ALTER TABLE document ADD COLUMN page_count INTEGER DEFAULT 0"))
+            app.logger.info("Added new column: page_count")
+        except Exception as e:
+            db.session.rollback()
+            app.logger.info(f"Column page_count not added: {str(e)}")
+            
+        try:
+            db.session.execute(db.text("ALTER TABLE document ADD COLUMN paragraph_count INTEGER DEFAULT 0"))
+            db.session.commit()
+            app.logger.info("Added new column: paragraph_count")
+        except Exception as e:
+            db.session.rollback()
+            app.logger.info(f"Column paragraph_count not added: {str(e)}")
+        
+        # Create any missing tables
         db.create_all()
         
         # Download spaCy resources
@@ -94,13 +111,14 @@ def create_app(config_class=Config):
                     # Extract text based on file type
                     try:
                         if file_type == 'pdf':
-                            text = extract_text_from_pdf(file_path)
+                            text, page_count = extract_text_from_pdf(file_path)
                         elif file_type == 'docx':
-                            text = extract_text_from_docx(file_path)
+                            text, page_count = extract_text_from_docx(file_path)
                         else:
                             raise ValueError(f"Unsupported file type: {file_type}")
                         
                         document.extracted_text = text
+                        document.page_count = page_count
                         document.status = 'processed'
                         
                         # Save the document to get an ID before processing paragraphs
@@ -109,10 +127,10 @@ def create_app(config_class=Config):
                         
                         # Process paragraphs
                         paragraph_count = process_paragraphs(text, document, db.session)
-                        app.logger.info(f"Found {paragraph_count} paragraphs in document {document.original_filename}")
+                        document.paragraph_count = paragraph_count
+                        app.logger.info(f"Found {paragraph_count} paragraphs in {page_count} pages for document {document.original_filename}")
                         db.session.commit()
                         
-                        app.logger.info(f"Processed {paragraph_count} paragraphs for {original_filename}")
                         successful_uploads += 1
                     except Exception as e:
                         app.logger.error(f"Error processing file {original_filename}: {str(e)}")
@@ -130,6 +148,7 @@ def create_app(config_class=Config):
         
         return render_template('upload.html')
     
+    # Rest of your routes remain the same...
     @app.route('/documents')
     def documents():
         documents = Document.query.order_by(Document.upload_date.desc()).all()
