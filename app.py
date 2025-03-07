@@ -4,12 +4,12 @@ import json
 import logging
 from logging.handlers import RotatingFileHandler
 from datetime import datetime
-from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory, abort
 from werkzeug.utils import secure_filename
 from config import Config
 from models import db, Document, Paragraph, document_paragraph
-from utils.pdf_extractor import extract_text_from_pdf, generate_pdf_preview
-from utils.docx_extractor import extract_text_from_docx, generate_docx_preview
+from utils.pdf_extractor import extract_text_from_pdf, create_pdf_preview_info, generate_page_preview
+from utils.docx_extractor import extract_text_from_docx, create_docx_preview_info, generate_section_preview
 from utils.excel_exporter import generate_excel_report
 from utils.paragraph_processor import download_spacy_resources, process_paragraphs
 
@@ -192,12 +192,12 @@ def create_app(config_class=Config):
                     try:
                         if file_type == 'pdf':
                             text, page_count = extract_text_from_pdf(file_path)
-                            # Generate PDF preview for multiple pages
-                            preview_info = generate_pdf_preview(file_path, app.config['PREVIEW_FOLDER'])
+                            # Just create preview info without generating images
+                            preview_info = create_pdf_preview_info(file_path)
                         elif file_type == 'docx':
                             text, page_count = extract_text_from_docx(file_path)
-                            # Generate DOCX preview for multiple sections
-                            preview_info = generate_docx_preview(file_path, app.config['PREVIEW_FOLDER'])
+                            # Just create preview info without generating images
+                            preview_info = create_docx_preview_info(file_path, page_count)
                         else:
                             raise ValueError(f"Unsupported file type: {file_type}")
                         
@@ -205,17 +205,9 @@ def create_app(config_class=Config):
                         document.page_count = page_count
                         document.status = 'processed'
                         
-                        # Save preview information as JSON
+                        # Save preview information as JSON (without generating any images)
                         if preview_info:
-                            # Store in preview_data column
                             document.preview_data = json.dumps(preview_info)
-                            
-                            # For backwards compatibility also store the first page in preview_image_path
-                            first_page_filename = preview_info['preview_format'].format(
-                                base=preview_info['base_filename'],
-                                page=1
-                            )
-                            document.preview_image_path = first_page_filename
                         
                         # Save the document to get an ID before processing paragraphs
                         db.session.add(document)
@@ -244,6 +236,26 @@ def create_app(config_class=Config):
         
         return render_template('upload.html')
     
+    @app.route('/generate-preview/<int:document_id>/<int:page_number>')
+    def generate_preview(document_id, page_number):
+        """Generate or retrieve a preview image for a specific document page."""
+        document = Document.query.get_or_404(document_id)
+        
+        # Get the file type from preview info
+        file_type = document.get_file_type_from_preview_info()
+        
+        # Generate the appropriate preview
+        if file_type == 'pdf':
+            preview_filename = generate_page_preview(document, page_number, app.config['PREVIEW_FOLDER'])
+        else:  # Default to docx
+            preview_filename = generate_section_preview(document, page_number, app.config['PREVIEW_FOLDER'])
+        
+        if not preview_filename:
+            return abort(404)
+            
+        # Redirect to the preview image
+        return redirect(url_for('preview_image', filename=preview_filename))
+    
     @app.route('/documents')
     def documents():
         documents = Document.query.order_by(Document.upload_date.desc()).all()
@@ -264,7 +276,7 @@ def create_app(config_class=Config):
         # Delete preview images if they exist
         preview_info = document.get_preview_info()
         if preview_info:
-            total_pages = preview_info.get('total_pages', 0)
+            total_pages = preview_info.get('document_page_count', 0)
             for page in range(1, total_pages + 1):
                 preview_filename = document.get_preview_filename(page)
                 if preview_filename:
@@ -333,7 +345,7 @@ def create_app(config_class=Config):
                 # Delete preview images
                 preview_info = document.get_preview_info()
                 if preview_info:
-                    total_pages = preview_info.get('total_pages', 0)
+                    total_pages = preview_info.get('document_page_count', 0)
                     for page in range(1, total_pages + 1):
                         preview_filename = document.get_preview_filename(page)
                         if preview_filename:

@@ -1,6 +1,7 @@
 from datetime import datetime
 from flask_sqlalchemy import SQLAlchemy
 import json
+import os
 
 db = SQLAlchemy()
 
@@ -23,7 +24,7 @@ class Document(db.Model):
     page_count = db.Column(db.Integer, default=0)  # Number of pages in the document
     paragraph_count = db.Column(db.Integer, default=0)  # Number of paragraphs identified
     
-    # Store preview data as JSON instead of a single path
+    # Store preview data as JSON
     preview_data = db.Column(db.Text, nullable=True)  # JSON storage for preview info
     
     # Keep this for backwards compatibility
@@ -40,7 +41,7 @@ class Document(db.Model):
             if self.preview_image_path:
                 return {
                     'base_filename': self.preview_image_path.split('_preview.')[0],
-                    'total_pages': 1,
+                    'document_page_count': self.page_count or 1,
                     'preview_format': self.preview_image_path
                 }
             return None
@@ -50,7 +51,7 @@ class Document(db.Model):
             return None
             
     def get_preview_filename(self, page=1):
-        """Get the filename for a specific preview page."""
+        """Get the expected filename for a specific preview page."""
         preview_info = self.get_preview_info()
         if not preview_info:
             return None
@@ -60,11 +61,11 @@ class Document(db.Model):
             if '{' not in preview_info.get('preview_format', ''):
                 return preview_info.get('preview_format')
                 
-            # Check if the requested page exists
-            if page < 1 or page > preview_info.get('total_pages', 0):
+            # Check if the requested page is valid
+            if page < 1 or page > preview_info.get('document_page_count', 0):
                 page = 1
                 
-            # Generate the filename using the format string
+            # Generate the expected filename using the format string
             return preview_info['preview_format'].format(
                 base=preview_info['base_filename'],
                 page=page
@@ -73,11 +74,27 @@ class Document(db.Model):
             return None
     
     def get_preview_count(self):
-        """Get the total number of preview pages available."""
+        """Get the total number of pages available for preview."""
         preview_info = self.get_preview_info()
         if not preview_info:
             return 0
-        return preview_info.get('total_pages', 0)
+        return preview_info.get('document_page_count', 0)
+        
+    def preview_exists(self, page_number, preview_dir):
+        """Check if a preview exists for the given page number."""
+        filename = self.get_preview_filename(page_number)
+        if not filename:
+            return False
+            
+        preview_path = os.path.join(preview_dir, filename)
+        return os.path.exists(preview_path)
+        
+    def get_file_type_from_preview_info(self):
+        """Get the file type from preview info or fallback to the document's file_type."""
+        preview_info = self.get_preview_info()
+        if preview_info and 'file_type' in preview_info:
+            return preview_info['file_type']
+        return self.file_type
 
     def __repr__(self):
         return f'<Document {self.original_filename}>'
