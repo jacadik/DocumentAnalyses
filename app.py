@@ -102,6 +102,7 @@ def create_app(config_class=Config):
                         
                         # Process paragraphs
                         paragraph_count = process_paragraphs(text, document, db.session)
+                        app.logger.info(f"Found {paragraph_count} paragraphs in document {document.original_filename}")
                         db.session.commit()
                         
                         app.logger.info(f"Processed {paragraph_count} paragraphs for {original_filename}")
@@ -126,6 +127,48 @@ def create_app(config_class=Config):
     def documents():
         documents = Document.query.order_by(Document.upload_date.desc()).all()
         return render_template('documents.html', documents=documents)
+    
+    @app.route('/document/delete/<int:id>', methods=['POST'])
+    def delete_document(id):
+        """Delete a document and remove any orphaned paragraphs."""
+        document = Document.query.get_or_404(id)
+        
+        # Store original filename for flash message
+        original_filename = document.original_filename
+        
+        # Get the stored filename to delete the physical file later
+        filename = document.filename
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        
+        # First, record all paragraphs associated with this document before deletion
+        paragraphs_to_check = list(document.paragraphs)
+        
+        # Remove the document from the database (will remove associations in junction table)
+        db.session.delete(document)
+        db.session.commit()
+        
+        # Now check if any of those paragraphs need to be deleted
+        paragraphs_deleted = 0
+        for paragraph in paragraphs_to_check:
+            # Reload the paragraph to get its current associations
+            paragraph = Paragraph.query.get(paragraph.id)
+            if paragraph and not paragraph.documents:
+                # If paragraph has no document associations, delete it
+                db.session.delete(paragraph)
+                paragraphs_deleted += 1
+        
+        db.session.commit()
+        
+        # Delete the physical file if it exists
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+                app.logger.info(f"Deleted file: {file_path}")
+            except Exception as e:
+                app.logger.error(f"Error deleting file {file_path}: {str(e)}")
+        
+        flash(f'Document "{original_filename}" deleted successfully. {paragraphs_deleted} unique paragraphs were also removed.', 'success')
+        return redirect(url_for('documents'))
     
     @app.route('/document/<int:id>')
     def view_document(id):

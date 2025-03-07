@@ -43,13 +43,68 @@
                     {% endif %}
                 </td>
                 <td>
-                    <a href="{{ url_for('view_document', id=doc.id) }}" class="btn btn-sm btn-info">View</a>
+                    <div class="btn-group">
+                        <a href="{{ url_for('view_document', id=doc.id) }}" class="btn btn-sm btn-info">View</a>
+                        <button type="button" class="btn btn-sm btn-danger" 
+                                data-bs-toggle="modal" 
+                                data-bs-target="#deleteModal" 
+                                data-doc-id="{{ doc.id }}"
+                                data-doc-name="{{ doc.original_filename }}">
+                            Delete
+                        </button>
+                    </div>
                 </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
 </div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteModalLabel">Confirm Deletion</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete <strong id="docName"></strong>?</p>
+                <p class="text-danger">This action cannot be undone.</p>
+                <p>Paragraphs that only appear in this document will also be deleted.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form id="deleteForm" method="POST" action="">
+                    <button type="submit" class="btn btn-danger">Delete Document</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const deleteModal = document.getElementById('deleteModal');
+        if (deleteModal) {
+            deleteModal.addEventListener('show.bs.modal', function(event) {
+                // Button that triggered the modal
+                const button = event.relatedTarget;
+                
+                // Extract info from data attributes
+                const docId = button.getAttribute('data-doc-id');
+                const docName = button.getAttribute('data-doc-name');
+                
+                // Update the modal content
+                document.getElementById('docName').textContent = docName;
+                
+                // Update form action
+                document.getElementById('deleteForm').action = '/document/delete/' + docId;
+            });
+        }
+    });
+</script>
+
 {% else %}
 <div class="alert alert-info">
     No documents uploaded yet. <a href="{{ url_for('upload') }}">Upload some documents</a> to get started.

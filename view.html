@@ -5,7 +5,16 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1>Document Details</h1>
-    <a href="{{ url_for('documents') }}" class="btn btn-secondary">Back to List</a>
+    <div>
+        <a href="{{ url_for('documents') }}" class="btn btn-secondary me-2">Back to List</a>
+        <button type="button" class="btn btn-danger" 
+                data-bs-toggle="modal" 
+                data-bs-target="#deleteModal" 
+                data-doc-id="{{ document.id }}"
+                data-doc-name="{{ document.original_filename }}">
+            Delete Document
+        </button>
+    </div>
 </div>
 
 <div class="card mb-4">
@@ -46,35 +55,56 @@
 {% if document.status == 'processed' and document.paragraphs %}
 <div class="card mb-4">
     <div class="card-header bg-light d-flex justify-content-between align-items-center">
-        <h5 class="mb-0">Paragraphs ({{ document.paragraphs|length }})</h5>
-        <span class="badge bg-primary">{{ document.paragraphs|length }} paragraphs</span>
+        <h5 class="mb-0">Paragraphs</h5>
+        <span class="badge bg-primary">{{ document.paragraphs|length }} paragraphs extracted</span>
     </div>
-    <div class="card-body">
-        <div class="list-group">
+    <div class="card-body p-0">
+        <div class="accordion" id="paragraphAccordion">
             {% for paragraph in document.paragraphs %}
-            <div class="list-group-item">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <strong>Paragraph #{{ paragraph.id }}</strong>
-                    {% if paragraph.documents|length > 1 %}
-                    <span class="badge bg-info">
-                        Appears in {{ paragraph.documents|length }} document(s)
-                    </span>
-                    {% else %}
-                    <span class="badge bg-secondary">Unique to this document</span>
-                    {% endif %}
-                </div>
-                <p>{{ paragraph.content }}</p>
-                {% if paragraph.documents|length > 1 %}
-                <div class="mt-2">
-                    <small class="text-muted">Also appears in: 
-                        {% for doc in paragraph.documents %}
-                            {% if doc.id != document.id %}
-                            <a href="{{ url_for('view_document', id=doc.id) }}">{{ doc.original_filename }}</a>{% if not loop.last %}, {% endif %}
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="heading{{ paragraph.id }}">
+                    <button class="accordion-button {% if not loop.first %}collapsed{% endif %}" type="button" 
+                            data-bs-toggle="collapse" data-bs-target="#collapse{{ paragraph.id }}" 
+                            aria-expanded="{% if loop.first %}true{% else %}false{% endif %}" 
+                            aria-controls="collapse{{ paragraph.id }}">
+                        <div class="d-flex justify-content-between align-items-center w-100 me-3">
+                            <div>
+                                <strong>Paragraph #{{ loop.index }}</strong>
+                                <small class="text-muted ms-2">{{ paragraph.content[:50] }}{% if paragraph.content|length > 50 %}...{% endif %}</small>
+                            </div>
+                            {% if paragraph.documents|length > 1 %}
+                            <span class="badge bg-info ms-2">
+                                Appears in {{ paragraph.documents|length }} document(s)
+                            </span>
+                            {% else %}
+                            <span class="badge bg-secondary ms-2">Unique</span>
                             {% endif %}
-                        {% endfor %}
-                    </small>
+                        </div>
+                    </button>
+                </h2>
+                <div id="collapse{{ paragraph.id }}" class="accordion-collapse collapse {% if loop.first %}show{% endif %}" 
+                    aria-labelledby="heading{{ paragraph.id }}" data-bs-parent="#paragraphAccordion">
+                    <div class="accordion-body">
+                        <div class="border-start border-4 border-primary ps-3 py-1">
+                            {{ paragraph.content }}
+                        </div>
+                        
+                        {% if paragraph.documents|length > 1 %}
+                        <div class="mt-3">
+                            <h6>Also appears in:</h6>
+                            <div>
+                                {% for doc in paragraph.documents %}
+                                    {% if doc.id != document.id %}
+                                    <a href="{{ url_for('view_document', id=doc.id) }}" class="badge bg-primary text-decoration-none me-1 mb-1">
+                                        {{ doc.original_filename }}
+                                    </a>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
                 </div>
-                {% endif %}
             </div>
             {% endfor %}
         </div>
@@ -94,4 +124,47 @@
     </div>
 </div>
 {% endif %}
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteModalLabel">Confirm Deletion</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete <strong>{{ document.original_filename }}</strong>?</p>
+                <p class="text-danger">This action cannot be undone.</p>
+                <p>Paragraphs that only appear in this document will also be deleted.</p>
+                <p>Paragraphs that appear in other documents will be preserved.</p>
+                
+                {% set unique_paragraphs = [] %}
+                {% for para in document.paragraphs %}
+                    {% if para.documents|length == 1 %}
+                        {% set _ = unique_paragraphs.append(para) %}
+                    {% endif %}
+                {% endfor %}
+                
+                {% if unique_paragraphs %}
+                <div class="alert alert-warning">
+                    <strong>Warning:</strong> {{ unique_paragraphs|length }} paragraph(s) exist only in this document and will be permanently deleted.
+                </div>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="POST" action="{{ url_for('delete_document', id=document.id) }}">
+                    <button type="submit" class="btn btn-danger">Delete Document</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize Bootstrap components if needed
+    });
+</script>
 {% endblock %}

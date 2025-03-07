@@ -31,6 +31,33 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
+    // Delete confirmation modal handler
+    const deleteModal = document.getElementById('deleteModal');
+    if (deleteModal) {
+        deleteModal.addEventListener('show.bs.modal', function(event) {
+            // Button that triggered the modal
+            const button = event.relatedTarget;
+            
+            // Extract info from data attributes (if not in view.html where it's pre-populated)
+            if (button.hasAttribute('data-doc-id') && button.hasAttribute('data-doc-name')) {
+                const docId = button.getAttribute('data-doc-id');
+                const docName = button.getAttribute('data-doc-name');
+                
+                // Find and update docName element if it exists
+                const docNameEl = this.querySelector('#docName');
+                if (docNameEl) {
+                    docNameEl.textContent = docName;
+                }
+                
+                // Update form action if it's in documents.html
+                const deleteForm = this.querySelector('#deleteForm');
+                if (deleteForm) {
+                    deleteForm.action = '/document/delete/' + docId;
+                }
+            }
+        });
+    }
+    
     // Enable tooltips if Bootstrap is available
     if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
         const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
