@@ -1,0 +1,27 @@
+document_analyzer/
+│
+├── app.py              # Main Flask application 
+├── config.py           # Configuration settings
+├── models.py           # Database models
+├── utils/
+│   ├── __init__.py
+│   ├── docx_extractor.py    # Word document text extraction
+│   ├── pdf_extractor.py     # PDF text extraction
+│   └── excel_exporter.py    # Excel report generation
+├── static/
+│   ├── css/
+│   │   └── styles.css
+│   └── js/
+│       └── main.js
+├── templates/
+│   ├── base.html       # Base template
+│   ├── index.html      # Home page
+│   ├── upload.html     # Upload form
+│   ├── documents.html  # List of documents
+│   ├── view.html       # View document details
+│   ├── logs.html       # View application logs
+│   └── view_log.html   # View specific log file
+├── uploads/            # Folder to store uploaded files
+├── logs/               # Folder for log files
+├── instance/           # Instance-specific data (SQLite database)
+└── requirements.txt    # Project dependencies

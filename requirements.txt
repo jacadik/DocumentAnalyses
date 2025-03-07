@@ -1,0 +1,7 @@
+Flask==2.2.3
+Flask-SQLAlchemy==3.0.3
+PyMuPDF==1.21.1
+python-docx==0.8.11
+pandas==1.5.3
+openpyxl==3.1.1
+Werkzeug==2.2.3
