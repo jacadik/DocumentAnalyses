@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Log File: {{ filename }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Log File: {{ filename }}</h1>
+    <a href="{{ url_for('logs') }}" class="btn btn-secondary">Back to Logs</a>
+</div>
+
+<div class="card">
+    <div class="card-header bg-light">
+        <h5 class="mb-0">Log Contents</h5>
+    </div>
+    <div class="card-body">
+        <div class="log-content border p-3 bg-light rounded">
+            <pre style="max-height: 600px; overflow-y: auto;">{% for line in log_contents %}{{ line }}{% endfor %}</pre>
+        </div>
+    </div>
+</div>
+{% endblock %}

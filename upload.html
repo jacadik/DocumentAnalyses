@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Documents{% endblock %}
+
+{% block content %}
+<h1>Upload Documents</h1>
+<p class="lead">Upload PDF and Word documents to extract their content.</p>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="POST" enctype="multipart/form-data">
+            <div class="mb-3">
+                <label for="file" class="form-label">Select files</label>
+                <input class="form-control" type="file" id="file" name="file" multiple accept=".pdf,.docx">
+                <div class="form-text">Supported formats: PDF, DOCX (Max size: 16MB)</div>
+            </div>
+            <div id="fileList" class="mb-3"></div>
+            <button type="submit" class="btn btn-primary">Upload and Process</button>
+        </form>
+    </div>
+</div>
+
+<div class="alert alert-info">
+    <h5>Upload Information</h5>
+    <ul>
+        <li>Files will be processed immediately after upload</li>
+        <li>Text will be extracted and stored in the database</li>
+        <li>Original files will be saved in the uploads folder</li>
+        <li>You can view the extracted text on the Documents page</li>
+    </ul>
+</div>
+{% endblock %}

@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Application Logs{% endblock %}
+
+{% block content %}
+<h1>Application Logs</h1>
+<p class="lead">View application logs to troubleshoot issues.</p>
+
+<div class="card mb-4">
+    <div class="card-header bg-light">
+        <h5 class="mb-0">Log Files</h5>
+    </div>
+    <div class="card-body">
+        {% if log_files %}
+        <div class="list-group">
+            {% for log_file in log_files %}
+            <a href="{{ url_for('view_log', filename=log_file) }}" class="list-group-item list-group-item-action">
+                {{ log_file }}
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="alert alert-info">No log files found.</div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header bg-light">
+        <h5 class="mb-0">Current Log</h5>
+    </div>
+    <div class="card-body">
+        <div class="log-content border p-3 bg-light rounded">
+            <pre style="max-height: 500px; overflow-y: auto;">{% for line in log_contents %}{{ line }}{% endfor %}</pre>
+        </div>
+    </div>
+</div>
+{% endblock %}

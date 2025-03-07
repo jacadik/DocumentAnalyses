@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Document Analyzer - Home{% endblock %}
+
+{% block content %}
+<div class="jumbotron bg-light p-5 rounded">
+    <h1 class="display-4">Document Analyzer</h1>
+    <p class="lead">A lightweight tool for analyzing document templates in migration projects.</p>
+    <hr class="my-4">
+    <p>Upload PDF and Word documents to extract and analyze their content.</p>
+    <div class="mt-4">
+        <a class="btn btn-primary btn-lg me-2" href="{{ url_for('upload') }}" role="button">Upload Documents</a>
+        <a class="btn btn-secondary btn-lg" href="{{ url_for('documents') }}" role="button">View Documents</a>
+    </div>
+</div>
+
+<div class="row mt-5">
+    <div class="col-md-4 mb-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">Document Upload</h5>
+                <p class="card-text">Upload PDF and Word documents to extract their text content.</p>
+                <a href="{{ url_for('upload') }}" class="btn btn-primary">Upload</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">Document List</h5>
+                <p class="card-text">View all uploaded documents and their extraction status.</p>
+                <a href="{{ url_for('documents') }}" class="btn btn-primary">View Documents</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">Export to Excel</h5>
+                <p class="card-text">Generate an Excel report of all processed documents.</p>
+                <a href="{{ url_for('export') }}" class="btn btn-primary">Export</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
