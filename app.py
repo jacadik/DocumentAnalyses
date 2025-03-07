@@ -6,11 +6,11 @@ from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory
 from werkzeug.utils import secure_filename
 from config import Config
-from models import db, Document, Paragraph
+from models import db, Document, Paragraph, document_paragraph  # Added document_paragraph import
 from utils.pdf_extractor import extract_text_from_pdf
 from utils.docx_extractor import extract_text_from_docx
 from utils.excel_exporter import generate_excel_report
-from utils.paragraph_processor import process_paragraphs
+from utils.paragraph_processor import download_nltk_resources, process_paragraphs
 
 
 def create_app(config_class=Config):
@@ -39,6 +39,13 @@ def create_app(config_class=Config):
     
     with app.app_context():
         db.create_all()
+        
+        # Download NLTK resources
+        try:
+            download_nltk_resources()
+        except Exception as e:
+            app.logger.error(f"Error downloading NLTK resources: {str(e)}")
+            app.logger.warning("Paragraph processing may have reduced functionality")
     
     # Helper function to check allowed file extensions
     def allowed_file(filename):
@@ -168,6 +175,48 @@ def create_app(config_class=Config):
                 app.logger.error(f"Error deleting file {file_path}: {str(e)}")
         
         flash(f'Document "{original_filename}" deleted successfully. {paragraphs_deleted} unique paragraphs were also removed.', 'success')
+        return redirect(url_for('documents'))
+    
+    @app.route('/documents/delete-all', methods=['POST'])
+    def delete_all_documents():
+        """Delete all documents and paragraphs from the database and file system."""
+        try:
+            # Get all documents for file deletion
+            documents = Document.query.all()
+            
+            # Count documents for flash message
+            document_count = len(documents)
+            
+            # Delete all physical files first
+            deleted_files = 0
+            for document in documents:
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], document.filename)
+                if os.path.exists(file_path):
+                    try:
+                        os.remove(file_path)
+                        deleted_files += 1
+                        app.logger.info(f"Deleted file: {file_path}")
+                    except Exception as e:
+                        app.logger.error(f"Error deleting file {file_path}: {str(e)}")
+            
+            # Get paragraph count for flash message
+            paragraph_count = Paragraph.query.count()
+            
+            # Delete all document-paragraph associations, documents, and paragraphs
+            # Note: Using raw SQL for efficiency with large datasets
+            db.session.execute(document_paragraph.delete())
+            db.session.execute(db.delete(Document))
+            db.session.execute(db.delete(Paragraph))
+            
+            db.session.commit()
+            
+            app.logger.info(f"Deleted all {document_count} documents and {paragraph_count} paragraphs")
+            flash(f'Successfully deleted all {document_count} documents, {deleted_files} files, and {paragraph_count} paragraphs.', 'success')
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Error deleting all documents: {str(e)}")
+            flash(f'Error deleting all documents: {str(e)}', 'error')
+        
         return redirect(url_for('documents'))
     
     @app.route('/document/<int:id>')

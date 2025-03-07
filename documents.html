@@ -7,7 +7,14 @@
     <h1>Document List</h1>
     <div>
         <a href="{{ url_for('upload') }}" class="btn btn-primary me-2">Upload New</a>
-        <a href="{{ url_for('export') }}" class="btn btn-success">Export to Excel</a>
+        <a href="{{ url_for('export') }}" class="btn btn-success me-2">Export to Excel</a>
+        {% if documents %}
+        <button type="button" class="btn btn-danger" 
+                data-bs-toggle="modal" 
+                data-bs-target="#deleteAllModal">
+            Delete All
+        </button>
+        {% endif %}
     </div>
 </div>
 
@@ -77,6 +84,34 @@
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <form id="deleteForm" method="POST" action="">
                     <button type="submit" class="btn btn-danger">Delete Document</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete All Confirmation Modal -->
+<div class="modal fade" id="deleteAllModal" tabindex="-1" aria-labelledby="deleteAllModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteAllModalLabel">Confirm Delete All</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-danger"><strong>Warning:</strong> You are about to delete ALL documents and paragraphs.</p>
+                <p>This action will:</p>
+                <ul>
+                    <li>Delete all <strong>{{ documents|length }}</strong> documents from the database</li>
+                    <li>Remove all document files from the server</li>
+                    <li>Delete all paragraphs from the database</li>
+                </ul>
+                <p class="text-danger">This action cannot be undone!</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="POST" action="{{ url_for('delete_all_documents') }}">
+                    <button type="submit" class="btn btn-danger">Delete Everything</button>
                 </form>
             </div>
         </div>
