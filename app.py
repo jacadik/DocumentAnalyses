@@ -10,7 +10,7 @@ from models import db, Document, Paragraph, document_paragraph  # Added document
 from utils.pdf_extractor import extract_text_from_pdf
 from utils.docx_extractor import extract_text_from_docx
 from utils.excel_exporter import generate_excel_report
-from utils.paragraph_processor import download_nltk_resources, process_paragraphs
+from utils.paragraph_processor import download_spacy_resources, process_paragraphs
 
 
 def create_app(config_class=Config):
@@ -40,11 +40,11 @@ def create_app(config_class=Config):
     with app.app_context():
         db.create_all()
         
-        # Download NLTK resources
+        # Download spaCy resources
         try:
-            download_nltk_resources()
+            download_spacy_resources()
         except Exception as e:
-            app.logger.error(f"Error downloading NLTK resources: {str(e)}")
+            app.logger.error(f"Error downloading spaCy resources: {str(e)}")
             app.logger.warning("Paragraph processing may have reduced functionality")
     
     # Helper function to check allowed file extensions

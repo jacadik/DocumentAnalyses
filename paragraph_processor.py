@@ -1,223 +1,269 @@
 import hashlib
 import re
 import logging
-import nltk
-# Make sure to install nltk: pip install nltk
-from nltk.tokenize import sent_tokenize
-from nltk.tokenize.punkt import PunktSentenceTokenizer
-from nltk.tokenize.texttiling import TextTilingTokenizer
-import string
 import unicodedata
+import spacy
+from spacy.lang.en import English
+from difflib import SequenceMatcher
 
 # Initialize logger
 logger = logging.getLogger(__name__)
 
-# Download NLTK resources (add this to app initialization)
-# This should be done once at application startup
-def download_nltk_resources():
-    """Download required NLTK resources."""
+# Initialize spaCy NLP pipeline (done on first use)
+nlp = None
+
+def download_spacy_resources():
+    """
+    Download spaCy resources needed for paragraph processing.
+    """
     try:
-        resources = ['punkt', 'averaged_perceptron_tagger']
-        for resource in resources:
-            try:
-                nltk.data.find(f'tokenizers/{resource}')
-            except LookupError:
-                nltk.download(resource)
-        logger.info("NLTK resources downloaded successfully")
+        # Download spaCy model
+        try:
+            spacy.load("en_core_web_sm")
+            logger.info("spaCy model already downloaded")
+        except OSError:
+            logger.info("Downloading spaCy model en_core_web_sm")
+            spacy.cli.download("en_core_web_sm")
+            logger.info("spaCy model downloaded successfully")
     except Exception as e:
-        logger.error(f"Error downloading NLTK resources: {str(e)}")
+        logger.error(f"Error downloading spaCy resources: {str(e)}")
+        logger.warning("Paragraph processing may have reduced functionality")
+
+# For backward compatibility with any scripts that might import this
+download_nltk_resources = download_spacy_resources
+
+def load_nlp():
+    """Load the appropriate spaCy model based on availability."""
+    try:
+        # Try loading the small English model first
+        return spacy.load("en_core_web_sm")
+    except OSError:
+        # If that fails, download and use the English tokenizer only
+        logger.warning("spaCy model not found, using basic English tokenizer")
+        try:
+            spacy.cli.download("en_core_web_sm")
+            return spacy.load("en_core_web_sm")
+        except Exception:
+            return English()
+    except Exception as e:
+        # Fallback to the basic English tokenizer
+        logger.error(f"Error loading spaCy model: {str(e)}")
+        return English()
 
 def preprocess_text(text):
-    """
-    Clean and normalize text before paragraph extraction.
-    
-    Args:
-        text (str): Raw text from document
-        
-    Returns:
-        str: Preprocessed text
-    """
+    """Clean and normalize text for processing."""
     if not text:
         return ""
     
     # Normalize unicode characters
     text = unicodedata.normalize('NFKC', text)
     
+    # Replace non-breaking spaces with regular spaces
+    text = text.replace('\xa0', ' ')
+    
+    # Standardize line breaks
+    text = text.replace('\r\n', '\n').replace('\r', '\n')
+    
     # Replace multiple spaces with single space
-    text = re.sub(r'\s+', ' ', text)
-    
-    # Replace multiple newlines with double newlines (to preserve paragraph breaks)
-    text = re.sub(r'\n{3,}', '\n\n', text)
-    
-    # Fix common OCR errors
-    text = text.replace('l-', 'i-')  # Common OCR error
-    text = text.replace('|', 'I')    # Pipe often confused with I
+    text = re.sub(r' +', ' ', text)
     
     return text
 
 def extract_paragraphs(text):
     """
-    Extract paragraphs from text using more advanced techniques.
-    
-    Args:
-        text (str): Text to extract paragraphs from
-        
-    Returns:
-        list: List of paragraph strings
+    Extract paragraphs using spaCy's linguistic analysis.
     """
-    if not text:
-        return []
+    global nlp
+    if nlp is None:
+        nlp = load_nlp()
     
     # Preprocess the text
     text = preprocess_text(text)
     
-    # First attempt: Split by double newlines (typical paragraph markers)
-    paragraphs = re.split(r'\n\s*\n', text)
+    # First, try splitting by double newlines (standard paragraph markers)
+    initial_paragraphs = [p.strip() for p in re.split(r'\n\s*\n', text) if p.strip()]
     
-    # Process and clean the paragraphs
-    result = []
-    for p in paragraphs:
-        p = p.strip()
-        
-        # Skip if the paragraph is too short or just punctuation/numbers
-        if not p or len(p) < 20:
-            continue
-            
-        # Skip if paragraph is just a number, page number, or header/footer
-        if re.match(r'^[\d\s\-\.]+$', p) or re.match(r'^page\s+\d+$', p, re.IGNORECASE):
-            continue
-            
-        # If paragraph is very long, try to split it into smaller paragraphs using TextTiling
-        if len(p) > 1000:
-            try:
-                # Initialize TextTiling tokenizer
-                tt = TextTilingTokenizer()
-                # Use TextTiling to find logical paragraph breaks in long text
-                subtiles = tt.tokenize(p)
-                # Add all subtiles as separate paragraphs
-                for tile in subtiles:
-                    tile = tile.strip()
-                    if tile and len(tile) >= 20:
-                        result.append(tile)
-            except Exception as e:
-                # If TextTiling fails, just add the long paragraph as is
-                logger.warning(f"TextTiling failed: {str(e)}, using original long paragraph")
-                result.append(p)
-        else:
-            result.append(p)
+    # If this splitting works well, process these paragraphs
+    paragraphs = []
+    if len(initial_paragraphs) > 1:
+        for para in initial_paragraphs:
+            if len(para) >= 20:  # Skip very short paragraphs
+                paragraphs.append(para)
     
-    # If regular paragraph splitting yields few results, try sentence-based approach
-    if len(result) <= 2 and len(text) > 300:
-        logger.info("Few paragraphs found, trying sentence-based approach")
-        sentences = sent_tokenize(text)
+    # If we didn't get good results from simple splitting, use spaCy
+    if len(paragraphs) <= 1:
+        # Process the document with spaCy
+        doc = nlp(text)
+        sentences = list(doc.sents)
         
-        # Group sentences into paragraphs (approx. 3-5 sentences per paragraph)
+        # Check if text starts with common paragraph starters
+        para_starters = [
+            r'^Dear\b',
+            r'^Thank you\b',
+            r'^We are\b',
+            r'^Your\b',
+            r'^This letter\b',
+            r'^Please\b'
+        ]
+        
+        # Group sentences into paragraphs
         current_paragraph = []
-        sentence_count = 0
-        
-        for sentence in sentences:
-            sentence = sentence.strip()
-            if not sentence:
-                continue
-                
-            current_paragraph.append(sentence)
-            sentence_count += 1
+        for i, sent in enumerate(sentences):
+            sent_text = sent.text.strip()
             
-            # Create a new paragraph after 3-5 sentences
-            if sentence_count >= 3 and (sentence_count >= 5 or sentence.endswith('.')):
-                result.append(' '.join(current_paragraph))
-                current_paragraph = []
-                sentence_count = 0
+            # Start a new paragraph?
+            start_new = False
+            if i > 0:  # Not for the first sentence
+                for pattern in para_starters:
+                    if re.match(pattern, sent_text, re.IGNORECASE):
+                        start_new = True
+                        break
+            
+            if start_new and current_paragraph:
+                # End current paragraph and start a new one
+                paragraphs.append(' '.join(current_paragraph))
+                current_paragraph = [sent_text]
+            else:
+                # Continue current paragraph
+                current_paragraph.append(sent_text)
         
-        # Add any remaining sentences as a paragraph
+        # Add the last paragraph if not empty
         if current_paragraph:
-            result.append(' '.join(current_paragraph))
+            paragraphs.append(' '.join(current_paragraph))
     
-    return result
+    # Filter out very short paragraphs
+    paragraphs = [p for p in paragraphs if len(p) >= 20]
+    
+    logger.info(f"Extracted {len(paragraphs)} paragraphs")
+    return paragraphs
 
-def normalize_paragraph(paragraph):
+def is_container(paragraph, other_paragraphs):
     """
-    Normalize paragraph text for more accurate duplicate detection.
+    Check if this paragraph is a container of multiple others.
+    Uses SequenceMatcher for accurate substring detection.
+    """
+    if len(paragraph) < 100:
+        return False
     
-    Args:
-        paragraph (str): Paragraph text
+    # Normalize paragraph
+    norm_para = ' '.join(paragraph.lower().split())
+    
+    # Count contained paragraphs
+    contained = 0
+    for other in other_paragraphs:
+        if other == paragraph or len(other) >= len(paragraph):
+            continue
         
-    Returns:
-        str: Normalized paragraph text
-    """
-    if not paragraph:
-        return ""
+        # Normalize other paragraph
+        norm_other = ' '.join(other.lower().split())
+        
+        # Check if other is fully contained in paragraph
+        if norm_other in norm_para:
+            contained += 1
+        else:
+            # Check with SequenceMatcher for near-matches
+            matcher = SequenceMatcher(None, norm_para, norm_other)
+            match = matcher.find_longest_match(0, len(norm_para), 0, len(norm_other))
+            if match.size >= len(norm_other) * 0.9:
+                contained += 1
     
-    # Convert to lowercase
-    text = paragraph.lower()
-    
-    # Remove extra whitespace
-    text = ' '.join(text.split())
-    
-    # Remove punctuation
-    text = text.translate(str.maketrans('', '', string.punctuation))
-    
-    # Remove specific words that don't contribute to meaning (articles, etc.)
-    stop_words = {'a', 'an', 'the', 'and', 'or', 'but', 'is', 'are', 'was', 'were'}
-    words = text.split()
-    text = ' '.join(word for word in words if word not in stop_words)
-    
-    return text
+    # It's a container if it contains multiple other paragraphs
+    return contained >= 2
 
 def hash_paragraph(paragraph):
-    """
-    Create a hash for a paragraph to identify duplicates efficiently.
-    
-    Args:
-        paragraph (str): Paragraph text
-        
-    Returns:
-        str: Hexadecimal hash value
-    """
+    """Create a hash for a paragraph to identify exact duplicates."""
     # Normalize the paragraph for consistent hashing
-    normalized = normalize_paragraph(paragraph)
+    normalized = ' '.join(paragraph.lower().split())
     
     # Create a SHA256 hash
     return hashlib.sha256(normalized.encode()).hexdigest()
 
+def is_structured_content(text):
+    """Check if text is a structured element like a bullet list or table."""
+    # Bullet list patterns
+    bullet_patterns = [
+        r'(?:\n\s*[\•\-\*\+◦→⇒]|\n\s*\d+[\.\)])[^\n]+(?:\n\s*[\•\-\*\+◦→⇒]|\n\s*\d+[\.\)])[^\n]+',
+        r'(?:\n\s*-\s+[^\n]+){2,}',
+        r'(?:\n\s*\*\s+[^\n]+){2,}',
+        r'(?:\n\s*\d+\.\s+[^\n]+){2,}'
+    ]
+    
+    # Table patterns
+    table_patterns = [
+        r'\|\s*\w+.*\|',
+        r'\+[-+]+\+',
+        r'[^\n]+\t[^\n]+'
+    ]
+    
+    # Check bullet patterns
+    for pattern in bullet_patterns:
+        if re.search(pattern, text, re.MULTILINE):
+            return True
+    
+    # Check table patterns
+    for pattern in table_patterns:
+        if re.search(pattern, text, re.MULTILINE):
+            return True
+    
+    return False
+
 def process_paragraphs(text, document, db_session):
     """
-    Process text into paragraphs, deduplicate, and associate with document.
-    
-    Args:
-        text (str): Full text from the document
-        document (Document): Document object to associate paragraphs with
-        db_session (SQLAlchemy.session): Database session
-        
-    Returns:
-        int: Number of paragraphs processed
+    Process text into paragraphs and associate with document.
+    This function maintains the exact signature expected by app.py.
     """
     from models import Paragraph
     
-    # Extract paragraphs from text
+    # Extract paragraphs using spaCy
     paragraphs = extract_paragraphs(text)
-    logger.info(f"Extracted {len(paragraphs)} paragraphs from document {document.original_filename}")
+    logger.info(f"Initial extraction: {len(paragraphs)} paragraphs")
+    
+    # Remove container paragraphs (except structured content)
+    filtered_paragraphs = []
+    containers_removed = 0
+    
+    for paragraph in paragraphs:
+        # Keep structured content intact
+        if is_structured_content(paragraph):
+            filtered_paragraphs.append(paragraph)
+        # Remove container paragraphs
+        elif not is_container(paragraph, paragraphs):
+            filtered_paragraphs.append(paragraph)
+        else:
+            containers_removed += 1
+    
+    # Safety check - if we removed too many, revert to original
+    if containers_removed > 0 and len(filtered_paragraphs) < 2:
+        logger.warning("Too many paragraphs removed as containers, using original extraction")
+        filtered_paragraphs = paragraphs
+    
+    logger.info(f"After processing: {len(filtered_paragraphs)} paragraphs ({containers_removed} containers removed)")
     
     # Process each paragraph
     paragraph_count = 0
-    for paragraph_text in paragraphs:
+    exact_match_count = 0
+    
+    for paragraph_text in filtered_paragraphs:
         # Create hash for efficient lookup
         paragraph_hash = hash_paragraph(paragraph_text)
         
-        # Check if paragraph already exists
+        # Check if paragraph already exists in database
         paragraph = Paragraph.query.filter_by(hash=paragraph_hash).first()
         
         if not paragraph:
-            # Create new paragraph if it doesn't exist
+            # Create new paragraph
             paragraph = Paragraph(
                 content=paragraph_text, 
                 hash=paragraph_hash
             )
             db_session.add(paragraph)
+        else:
+            exact_match_count += 1
         
         # Associate paragraph with document if not already associated
         if paragraph not in document.paragraphs:
             document.paragraphs.append(paragraph)
             paragraph_count += 1
     
+    logger.info(f"Document processing complete: {paragraph_count} paragraphs added")
     return paragraph_count
