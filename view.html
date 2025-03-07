@@ -54,20 +54,65 @@
     </div>
 </div>
 
-{% if document.preview_image_path %}
+{% if total_pages > 0 %}
 <div class="card mb-4">
     <div class="card-header bg-light d-flex justify-content-between align-items-center">
         <h5 class="mb-0">Document Preview</h5>
-        {% if document.file_type == 'pdf' %}
-        <span class="badge bg-info">Page 1 of {{ document.page_count }}</span>
-        {% endif %}
+        <div class="d-flex align-items-center">
+            {% if document.file_type == 'pdf' %}
+            <span class="badge bg-info me-3">Page {{ current_page }} of {{ total_pages }}</span>
+            {% else %}
+            <span class="badge bg-info me-3">Section {{ current_page }} of {{ total_pages }}</span>
+            {% endif %}
+            
+            {% if total_pages > 1 %}
+            <nav aria-label="Preview navigation">
+                <ul class="pagination pagination-sm mb-0">
+                    <li class="page-item {% if current_page == 1 %}disabled{% endif %}">
+                        <a class="page-link" href="{{ url_for('view_document', id=document.id, page=current_page-1) if current_page > 1 else '#' }}" aria-label="Previous">
+                            <span aria-hidden="true">&laquo;</span>
+                        </a>
+                    </li>
+                    
+                    {% for page_num in range(1, total_pages + 1) %}
+                    <li class="page-item {% if page_num == current_page %}active{% endif %}">
+                        <a class="page-link" href="{{ url_for('view_document', id=document.id, page=page_num) }}">{{ page_num }}</a>
+                    </li>
+                    {% endfor %}
+                    
+                    <li class="page-item {% if current_page == total_pages %}disabled{% endif %}">
+                        <a class="page-link" href="{{ url_for('view_document', id=document.id, page=current_page+1) if current_page < total_pages else '#' }}" aria-label="Next">
+                            <span aria-hidden="true">&raquo;</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            {% endif %}
+        </div>
     </div>
     <div class="card-body text-center">
-        <img src="{{ url_for('preview_image', filename=document.preview_image_path) }}" 
-             alt="Document Preview" 
+        {% if document.get_preview_filename(current_page) %}
+        <img src="{{ url_for('preview_image', filename=document.get_preview_filename(current_page)) }}" 
+             alt="Document Preview - Page {{ current_page }}" 
              class="img-fluid border rounded shadow" 
              style="max-height: 800px;">
+        {% else %}
+        <div class="alert alert-info">
+            Preview not available for this page.
+        </div>
+        {% endif %}
     </div>
+    
+    {% if total_pages > 1 %}
+    <div class="card-footer text-center">
+        <div class="btn-group">
+            <a href="{{ url_for('view_document', id=document.id, page=1) }}" class="btn btn-outline-primary" {% if current_page == 1 %}disabled{% endif %}>First</a>
+            <a href="{{ url_for('view_document', id=document.id, page=current_page-1) }}" class="btn btn-outline-primary" {% if current_page == 1 %}disabled{% endif %}>Previous</a>
+            <a href="{{ url_for('view_document', id=document.id, page=current_page+1) }}" class="btn btn-outline-primary" {% if current_page == total_pages %}disabled{% endif %}>Next</a>
+            <a href="{{ url_for('view_document', id=document.id, page=total_pages) }}" class="btn btn-outline-primary" {% if current_page == total_pages %}disabled{% endif %}>Last</a>
+        </div>
+    </div>
+    {% endif %}
 </div>
 {% endif %}
 

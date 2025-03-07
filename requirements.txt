@@ -9,4 +9,4 @@ spacy==3.5.3
 rapidfuzz==3.0.0
 scikit-learn==1.2.2
 numpy==1.24.3
-Pillow==9.4.0  # Added for document preview generation
+Pillow==9.4.0

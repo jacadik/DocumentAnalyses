@@ -1,5 +1,6 @@
 import os
 import uuid
+import json
 import logging
 from logging.handlers import RotatingFileHandler
 from datetime import datetime
@@ -11,6 +12,82 @@ from utils.pdf_extractor import extract_text_from_pdf, generate_pdf_preview
 from utils.docx_extractor import extract_text_from_docx, generate_docx_preview
 from utils.excel_exporter import generate_excel_report
 from utils.paragraph_processor import download_spacy_resources, process_paragraphs
+
+
+def fix_database_schema(app):
+    """Ensure the database schema is updated properly."""
+    with app.app_context():
+        # First, check if the column exists
+        try:
+            db.session.execute(db.text("SELECT preview_data FROM document LIMIT 1"))
+            app.logger.info("preview_data column already exists")
+            db.session.commit()
+            return True
+        except Exception:
+            # Column doesn't exist, let's create it
+            app.logger.info("preview_data column doesn't exist, attempting to add it")
+            db.session.rollback()
+            
+            try:
+                # Different approach for SQLite
+                db.session.execute(db.text("ALTER TABLE document ADD COLUMN preview_data TEXT"))
+                db.session.commit()
+                app.logger.info("Added preview_data column successfully")
+                return True
+            except Exception as e:
+                db.session.rollback()
+                app.logger.error(f"Error adding preview_data column: {str(e)}")
+                
+                # If direct ALTER TABLE fails, try the more complex approach
+                try:
+                    # This is a more involved way to add a column in SQLite
+                    # 1. Rename the existing table
+                    db.session.execute(db.text("ALTER TABLE document RENAME TO document_old"))
+                    
+                    # 2. Create a new table with the desired schema
+                    db.session.execute(db.text("""
+                        CREATE TABLE document (
+                            id INTEGER NOT NULL, 
+                            filename VARCHAR(255) NOT NULL, 
+                            original_filename VARCHAR(255) NOT NULL, 
+                            file_type VARCHAR(10) NOT NULL, 
+                            file_size INTEGER NOT NULL, 
+                            upload_date DATETIME, 
+                            extracted_text TEXT, 
+                            status VARCHAR(20), 
+                            error_message TEXT, 
+                            page_count INTEGER, 
+                            paragraph_count INTEGER,
+                            preview_image_path VARCHAR(255),
+                            preview_data TEXT,
+                            PRIMARY KEY (id)
+                        )
+                    """))
+                    
+                    # 3. Copy data from old table to new table
+                    db.session.execute(db.text("""
+                        INSERT INTO document 
+                        (id, filename, original_filename, file_type, file_size, 
+                         upload_date, extracted_text, status, error_message, 
+                         page_count, paragraph_count, preview_image_path)
+                        SELECT 
+                        id, filename, original_filename, file_type, file_size, 
+                        upload_date, extracted_text, status, error_message, 
+                        page_count, paragraph_count, preview_image_path
+                        FROM document_old
+                    """))
+                    
+                    # 4. Drop the old table
+                    db.session.execute(db.text("DROP TABLE document_old"))
+                    
+                    # 5. Commit changes
+                    db.session.commit()
+                    app.logger.info("Successfully rebuilt document table with preview_data column")
+                    return True
+                except Exception as rebuild_error:
+                    db.session.rollback()
+                    app.logger.error(f"Failed to rebuild table: {str(rebuild_error)}")
+                    return False
 
 
 def create_app(config_class=Config):
@@ -38,6 +115,9 @@ def create_app(config_class=Config):
         app.logger.setLevel(logging.INFO)
         app.logger.info('Document Analyzer starting up')
     
+    # Fix database schema before continuing
+    fix_database_schema(app)
+    
     with app.app_context():
         # Add new columns to the existing database table if they don't exist
         try:
@@ -53,14 +133,6 @@ def create_app(config_class=Config):
         except Exception as e:
             db.session.rollback()
             app.logger.info(f"Column paragraph_count not added: {str(e)}")
-            
-        try:
-            db.session.execute(db.text("ALTER TABLE document ADD COLUMN preview_image_path VARCHAR(255)"))
-            db.session.commit()
-            app.logger.info("Added new column: preview_image_path")
-        except Exception as e:
-            db.session.rollback()
-            app.logger.info(f"Column preview_image_path not added: {str(e)}")
         
         # Create any missing tables
         db.create_all()
@@ -120,12 +192,12 @@ def create_app(config_class=Config):
                     try:
                         if file_type == 'pdf':
                             text, page_count = extract_text_from_pdf(file_path)
-                            # Generate PDF preview
-                            preview_filename = generate_pdf_preview(file_path, app.config['PREVIEW_FOLDER'])
+                            # Generate PDF preview for multiple pages
+                            preview_info = generate_pdf_preview(file_path, app.config['PREVIEW_FOLDER'])
                         elif file_type == 'docx':
                             text, page_count = extract_text_from_docx(file_path)
-                            # Generate DOCX preview
-                            preview_filename = generate_docx_preview(file_path, app.config['PREVIEW_FOLDER'])
+                            # Generate DOCX preview for multiple sections
+                            preview_info = generate_docx_preview(file_path, app.config['PREVIEW_FOLDER'])
                         else:
                             raise ValueError(f"Unsupported file type: {file_type}")
                         
@@ -133,9 +205,17 @@ def create_app(config_class=Config):
                         document.page_count = page_count
                         document.status = 'processed'
                         
-                        # Save preview image path if generation was successful
-                        if preview_filename:
-                            document.preview_image_path = preview_filename
+                        # Save preview information as JSON
+                        if preview_info:
+                            # Store in preview_data column
+                            document.preview_data = json.dumps(preview_info)
+                            
+                            # For backwards compatibility also store the first page in preview_image_path
+                            first_page_filename = preview_info['preview_format'].format(
+                                base=preview_info['base_filename'],
+                                page=1
+                            )
+                            document.preview_image_path = first_page_filename
                         
                         # Save the document to get an ID before processing paragraphs
                         db.session.add(document)
@@ -181,15 +261,20 @@ def create_app(config_class=Config):
         filename = document.filename
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         
-        # Delete preview image if it exists
-        if document.preview_image_path:
-            preview_path = os.path.join(app.config['PREVIEW_FOLDER'], document.preview_image_path)
-            if os.path.exists(preview_path):
-                try:
-                    os.remove(preview_path)
-                    app.logger.info(f"Deleted preview image: {preview_path}")
-                except Exception as e:
-                    app.logger.error(f"Error deleting preview image {preview_path}: {str(e)}")
+        # Delete preview images if they exist
+        preview_info = document.get_preview_info()
+        if preview_info:
+            total_pages = preview_info.get('total_pages', 0)
+            for page in range(1, total_pages + 1):
+                preview_filename = document.get_preview_filename(page)
+                if preview_filename:
+                    preview_path = os.path.join(app.config['PREVIEW_FOLDER'], preview_filename)
+                    if os.path.exists(preview_path):
+                        try:
+                            os.remove(preview_path)
+                            app.logger.info(f"Deleted preview image: {preview_path}")
+                        except Exception as e:
+                            app.logger.error(f"Error deleting preview image {preview_path}: {str(e)}")
         
         # First, record all paragraphs associated with this document before deletion
         paragraphs_to_check = list(document.paragraphs)
@@ -245,16 +330,21 @@ def create_app(config_class=Config):
                     except Exception as e:
                         app.logger.error(f"Error deleting file {file_path}: {str(e)}")
                 
-                # Delete preview image
-                if document.preview_image_path:
-                    preview_path = os.path.join(app.config['PREVIEW_FOLDER'], document.preview_image_path)
-                    if os.path.exists(preview_path):
-                        try:
-                            os.remove(preview_path)
-                            deleted_previews += 1
-                            app.logger.info(f"Deleted preview image: {preview_path}")
-                        except Exception as e:
-                            app.logger.error(f"Error deleting preview image {preview_path}: {str(e)}")
+                # Delete preview images
+                preview_info = document.get_preview_info()
+                if preview_info:
+                    total_pages = preview_info.get('total_pages', 0)
+                    for page in range(1, total_pages + 1):
+                        preview_filename = document.get_preview_filename(page)
+                        if preview_filename:
+                            preview_path = os.path.join(app.config['PREVIEW_FOLDER'], preview_filename)
+                            if os.path.exists(preview_path):
+                                try:
+                                    os.remove(preview_path)
+                                    deleted_previews += 1
+                                    app.logger.info(f"Deleted preview image: {preview_path}")
+                                except Exception as e:
+                                    app.logger.error(f"Error deleting preview image {preview_path}: {str(e)}")
             
             # Get paragraph count for flash message
             paragraph_count = Paragraph.query.count()
@@ -268,7 +358,7 @@ def create_app(config_class=Config):
             db.session.commit()
             
             app.logger.info(f"Deleted all {document_count} documents, {deleted_files} files, {deleted_previews} previews, and {paragraph_count} paragraphs")
-            flash(f'Successfully deleted all {document_count} documents, {deleted_files} files, and {paragraph_count} paragraphs.', 'success')
+            flash(f'Successfully deleted all {document_count} documents, {deleted_files} files, {deleted_previews} preview images, and {paragraph_count} paragraphs.', 'success')
         except Exception as e:
             db.session.rollback()
             app.logger.error(f"Error deleting all documents: {str(e)}")
@@ -279,7 +369,21 @@ def create_app(config_class=Config):
     @app.route('/document/<int:id>')
     def view_document(id):
         document = Document.query.get_or_404(id)
-        return render_template('view.html', document=document)
+        
+        # Get the current page from query parameters (default to page 1)
+        current_page = request.args.get('page', 1, type=int)
+        
+        # Get total preview pages available
+        total_pages = document.get_preview_count()
+        
+        # Validate current_page
+        if current_page < 1 or current_page > total_pages:
+            current_page = 1
+        
+        return render_template('view.html', 
+                            document=document, 
+                            current_page=current_page,
+                            total_pages=total_pages)
     
     # Add a route to serve preview images
     @app.route('/preview/<filename>')
