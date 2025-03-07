@@ -26,10 +26,11 @@ def generate_excel_report(documents, output_dir):
                 'Filename': doc.original_filename,
                 'File Type': doc.file_type.upper(),
                 'File Size (KB)': round(doc.file_size / 1024, 2),
+                'Page Count': doc.page_count,
+                'Paragraph Count': doc.paragraph_count,
                 'Upload Date': doc.upload_date,
                 'Status': doc.status,
                 'Text Length (chars)': len(doc.extracted_text) if doc.extracted_text else 0,
-                'Paragraph Count': len(doc.paragraphs)
             })
         
         # Create text data for the second sheet
@@ -38,6 +39,8 @@ def generate_excel_report(documents, output_dir):
             text_data.append({
                 'ID': doc.id,
                 'Filename': doc.original_filename,
+                'Pages': doc.page_count,
+                'Paragraphs': doc.paragraph_count,
                 'Extracted Text': doc.extracted_text or "No text extracted"
             })
             

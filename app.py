@@ -7,8 +7,8 @@ from flask import Flask, render_template, request, redirect, url_for, flash, sen
 from werkzeug.utils import secure_filename
 from config import Config
 from models import db, Document, Paragraph, document_paragraph
-from utils.pdf_extractor import extract_text_from_pdf
-from utils.docx_extractor import extract_text_from_docx
+from utils.pdf_extractor import extract_text_from_pdf, generate_pdf_preview
+from utils.docx_extractor import extract_text_from_docx, generate_docx_preview
 from utils.excel_exporter import generate_excel_report
 from utils.paragraph_processor import download_spacy_resources, process_paragraphs
 
@@ -19,6 +19,7 @@ def create_app(config_class=Config):
     
     # Ensure necessary directories exist
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    os.makedirs(app.config['PREVIEW_FOLDER'], exist_ok=True)  # Create preview folder
     os.makedirs(app.config['LOG_FOLDER'], exist_ok=True)
     os.makedirs(os.path.join(os.path.dirname(app.instance_path)), exist_ok=True)
     
@@ -48,11 +49,18 @@ def create_app(config_class=Config):
             
         try:
             db.session.execute(db.text("ALTER TABLE document ADD COLUMN paragraph_count INTEGER DEFAULT 0"))
-            db.session.commit()
             app.logger.info("Added new column: paragraph_count")
         except Exception as e:
             db.session.rollback()
             app.logger.info(f"Column paragraph_count not added: {str(e)}")
+            
+        try:
+            db.session.execute(db.text("ALTER TABLE document ADD COLUMN preview_image_path VARCHAR(255)"))
+            db.session.commit()
+            app.logger.info("Added new column: preview_image_path")
+        except Exception as e:
+            db.session.rollback()
+            app.logger.info(f"Column preview_image_path not added: {str(e)}")
         
         # Create any missing tables
         db.create_all()
@@ -112,14 +120,22 @@ def create_app(config_class=Config):
                     try:
                         if file_type == 'pdf':
                             text, page_count = extract_text_from_pdf(file_path)
+                            # Generate PDF preview
+                            preview_filename = generate_pdf_preview(file_path, app.config['PREVIEW_FOLDER'])
                         elif file_type == 'docx':
                             text, page_count = extract_text_from_docx(file_path)
+                            # Generate DOCX preview
+                            preview_filename = generate_docx_preview(file_path, app.config['PREVIEW_FOLDER'])
                         else:
                             raise ValueError(f"Unsupported file type: {file_type}")
                         
                         document.extracted_text = text
                         document.page_count = page_count
                         document.status = 'processed'
+                        
+                        # Save preview image path if generation was successful
+                        if preview_filename:
+                            document.preview_image_path = preview_filename
                         
                         # Save the document to get an ID before processing paragraphs
                         db.session.add(document)
@@ -148,7 +164,6 @@ def create_app(config_class=Config):
         
         return render_template('upload.html')
     
-    # Rest of your routes remain the same...
     @app.route('/documents')
     def documents():
         documents = Document.query.order_by(Document.upload_date.desc()).all()
@@ -165,6 +180,16 @@ def create_app(config_class=Config):
         # Get the stored filename to delete the physical file later
         filename = document.filename
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        
+        # Delete preview image if it exists
+        if document.preview_image_path:
+            preview_path = os.path.join(app.config['PREVIEW_FOLDER'], document.preview_image_path)
+            if os.path.exists(preview_path):
+                try:
+                    os.remove(preview_path)
+                    app.logger.info(f"Deleted preview image: {preview_path}")
+                except Exception as e:
+                    app.logger.error(f"Error deleting preview image {preview_path}: {str(e)}")
         
         # First, record all paragraphs associated with this document before deletion
         paragraphs_to_check = list(document.paragraphs)
@@ -206,9 +231,11 @@ def create_app(config_class=Config):
             # Count documents for flash message
             document_count = len(documents)
             
-            # Delete all physical files first
+            # Delete all physical files and preview images
             deleted_files = 0
+            deleted_previews = 0
             for document in documents:
+                # Delete document file
                 file_path = os.path.join(app.config['UPLOAD_FOLDER'], document.filename)
                 if os.path.exists(file_path):
                     try:
@@ -217,6 +244,17 @@ def create_app(config_class=Config):
                         app.logger.info(f"Deleted file: {file_path}")
                     except Exception as e:
                         app.logger.error(f"Error deleting file {file_path}: {str(e)}")
+                
+                # Delete preview image
+                if document.preview_image_path:
+                    preview_path = os.path.join(app.config['PREVIEW_FOLDER'], document.preview_image_path)
+                    if os.path.exists(preview_path):
+                        try:
+                            os.remove(preview_path)
+                            deleted_previews += 1
+                            app.logger.info(f"Deleted preview image: {preview_path}")
+                        except Exception as e:
+                            app.logger.error(f"Error deleting preview image {preview_path}: {str(e)}")
             
             # Get paragraph count for flash message
             paragraph_count = Paragraph.query.count()
@@ -229,7 +267,7 @@ def create_app(config_class=Config):
             
             db.session.commit()
             
-            app.logger.info(f"Deleted all {document_count} documents and {paragraph_count} paragraphs")
+            app.logger.info(f"Deleted all {document_count} documents, {deleted_files} files, {deleted_previews} previews, and {paragraph_count} paragraphs")
             flash(f'Successfully deleted all {document_count} documents, {deleted_files} files, and {paragraph_count} paragraphs.', 'success')
         except Exception as e:
             db.session.rollback()
@@ -242,6 +280,11 @@ def create_app(config_class=Config):
     def view_document(id):
         document = Document.query.get_or_404(id)
         return render_template('view.html', document=document)
+    
+    # Add a route to serve preview images
+    @app.route('/preview/<filename>')
+    def preview_image(filename):
+        return send_from_directory(app.config['PREVIEW_FOLDER'], filename)
     
     @app.route('/paragraphs')
     def view_paragraphs():

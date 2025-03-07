@@ -21,6 +21,7 @@ class Document(db.Model):
     error_message = db.Column(db.Text, nullable=True)
     page_count = db.Column(db.Integer, default=0)  # Number of pages in the document
     paragraph_count = db.Column(db.Integer, default=0)  # Number of paragraphs identified
+    preview_image_path = db.Column(db.String(255), nullable=True)  # Path to preview image
     
     # Many-to-many relationship with paragraphs
     paragraphs = db.relationship('Paragraph', secondary=document_paragraph, 
