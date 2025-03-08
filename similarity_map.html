@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+
+{% block title %}Document Similarity Map{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Document Similarity Map</h1>
+    <div>
+        <a href="{{ url_for('documents') }}" class="btn btn-secondary me-2">Back to Documents</a>
+        <form method="POST" action="{{ url_for('calculate_similarities') }}" class="d-inline-block">
+            <div class="input-group">
+                <input type="number" name="min_similarity" min="0.1" max="0.9" step="0.05" class="form-control" 
+                       value="0.3" style="max-width: 100px;" title="Minimum similarity threshold (0.1-0.9)">
+                <button type="submit" class="btn btn-primary">Recalculate Similarities</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if not similarity_count %}
+<div class="alert alert-info">
+    <p>No document similarities calculated yet. Click "Recalculate Similarities" to analyze document relationships.</p>
+    {% if documents|length < 2 %}
+    <p>Note: You need at least 2 processed documents to calculate similarities.</p>
+    {% endif %}
+</div>
+{% endif %}
+
+{% if similarity_count > 0 %}
+<div class="card mb-4">
+    <div class="card-header bg-light">
+        <h5 class="mb-0">Document Similarity Network</h5>
+    </div>
+    <div class="card-body p-0">
+        <div id="similarity-network" style="width: 100%; height: 600px; border: 1px solid #eee; background-color: #fafafa;"></div>
+    </div>
+    <div class="card-footer">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <span class="badge bg-danger me-2">PDF</span>
+                <span class="badge bg-primary me-2">DOCX</span>
+                <small class="text-muted">Node size indicates number of paragraphs</small>
+            </div>
+            <div>
+                <button class="btn btn-sm btn-outline-secondary" id="resetZoomBtn">Reset View</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header bg-light">
+        <h5 class="mb-0">Strongest Document Similarities</h5>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Document 1</th>
+                        <th>Document 2</th>
+                        <th>Similarity Score</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for sim in similarities %}
+                    <tr>
+                        <td>
+                            <a href="{{ url_for('view_document', id=sim.source_id) }}">
+                                {{ sim.source.original_filename }}
+                            </a>
+                        </td>
+                        <td>
+                            <a href="{{ url_for('view_document', id=sim.target_id) }}">
+                                {{ sim.target.original_filename }}
+                            </a>
+                        </td>
+                        <td>{{ (sim.similarity_score * 100)|round(1) }}%</td>
+                        <td>
+                            <a href="{{ url_for('compare_documents', doc1=sim.source_id, doc2=sim.target_id) }}" class="btn btn-sm btn-outline-primary">
+                                Compare
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Visualization data
+        const data = {{ visualization_data|tojson }};
+        
+        // Add colors based on file type
+        data.nodes.forEach(node => {
+            if (node.file_type === 'pdf') {
+                node.color = '#DC3545'; // Red for PDFs
+            } else if (node.file_type === 'docx') {
+                node.color = '#0D6EFD'; // Blue for DOCX
+            } else {
+                node.color = '#6C757D'; // Gray for others
+            }
+        });
+        
+        // Create visualization
+        createSimilarityNetwork('#similarity-network', data);
+    });
+
+    function createSimilarityNetwork(container, data) {
+        const width = document.querySelector(container).clientWidth;
+        const height = 600;
+        
+        // Clear any existing visualization
+        d3.select(container).html("");
+        
+        const svg = d3.select(container)
+            .append("svg")
+            .attr("width", width)
+            .attr("height", height)
+            .call(d3.zoom().on("zoom", function(event) {
+                g.attr("transform", event.transform);
+            }));
+            
+        const g = svg.append("g");
+        
+        // Set up force simulation
+        const simulation = d3.forceSimulation(data.nodes)
+            .force("link", d3.forceLink(data.links).id(d => d.id).distance(d => 200 * (1 - d.similarity)))
+            .force("charge", d3.forceManyBody().strength(-300))
+            .force("center", d3.forceCenter(width / 2, height / 2))
+            .force("x", d3.forceX(width / 2).strength(0.1))
+            .force("y", d3.forceY(height / 2).strength(0.1));
+        
+        // Create links
+        const link = g.append("g")
+            .attr("class", "links")
+            .selectAll("line")
+            .data(data.links)
+            .enter().append("line")
+            .attr("stroke", "#999")
+            .attr("stroke-opacity", 0.6)
+            .attr("stroke-width", d => Math.max(1, d.value));
+        
+        // Create nodes
+        const node = g.append("g")
+            .attr("class", "nodes")
+            .selectAll("g")
+            .data(data.nodes)
+            .enter().append("g")
+            .call(d3.drag()
+                .on("start", dragstarted)
+                .on("drag", dragged)
+                .on("end", dragended));
+        
+        // Add circles to nodes
+        node.append("circle")
+            .attr("r", d => d.size)
+            .attr("fill", d => d.color)
+            .attr("stroke", "#fff")
+            .attr("stroke-width", 1.5);
+        
+        // Add text labels
+        node.append("text")
+            .text(d => trimFilename(d.name))
+            .attr('x', d => d.size + 2)
+            .attr('y', 4)
+            .attr('font-size', '10px')
+            .attr('font-family', 'Arial, sans-serif');
+        
+        // Add title for hover tooltip
+        node.append("title")
+            .text(d => `${d.name}\n${d.paragraphs} paragraphs`);
+        
+        // Update positions on each tick
+        simulation.on("tick", () => {
+            link
+                .attr("x1", d => d.source.x)
+                .attr("y1", d => d.source.y)
+                .attr("x2", d => d.target.x)
+                .attr("y2", d => d.target.y);
+            
+            node
+                .attr("transform", d => `translate(${d.x},${d.y})`);
+        });
+        
+        // Reset zoom button
+        document.getElementById('resetZoomBtn').addEventListener('click', function() {
+            svg.transition().duration(750).call(
+                d3.zoom().transform,
+                d3.zoomIdentity,
+                d3.zoomTransform(svg.node()).invert([width / 2, height / 2])
+            );
+        });
+        
+        // Drag functions
+        function dragstarted(event, d) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+        }
+        
+        function dragged(event, d) {
+            d.fx = event.x;
+            d.fy = event.y;
+        }
+        
+        function dragended(event, d) {
+            if (!event.active) simulation.alphaTarget(0);
+            d.fx = null;
+            d.fy = null;
+        }
+        
+        // Helper function to trim long filenames
+        function trimFilename(filename) {
+            if (filename.length > 20) {
+                return filename.substring(0, 17) + '...';
+            }
+            return filename;
+        }
+    }
+</script>
+{% endif %}
+{% endblock %}
