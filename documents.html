@@ -55,14 +55,14 @@
                 </td>
                 <td>
                     <div class="btn-group">
-                        <a href="{{ url_for('view_document', id=doc.id) }}" class="btn btn-sm btn-info">View</a>
-                        <button type="button" class="btn btn-sm btn-danger" 
+                        <button type="button" class="btn btn-sm btn-danger me-2" 
                                 data-bs-toggle="modal" 
                                 data-bs-target="#deleteModal" 
                                 data-doc-id="{{ doc.id }}"
                                 data-doc-name="{{ doc.original_filename }}">
                             Delete
                         </button>
+                        <a href="{{ url_for('view_document', id=doc.id) }}" class="btn btn-sm btn-info">View</a>
                     </div>
                 </td>
             </tr>

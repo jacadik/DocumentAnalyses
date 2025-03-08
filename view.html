@@ -6,14 +6,14 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1>Document Details</h1>
     <div>
-        <a href="{{ url_for('documents') }}" class="btn btn-secondary me-2">Back to List</a>
-        <button type="button" class="btn btn-danger" 
+        <button type="button" class="btn btn-danger me-2" 
                 data-bs-toggle="modal" 
                 data-bs-target="#deleteModal" 
                 data-doc-id="{{ document.id }}"
                 data-doc-name="{{ document.original_filename }}">
             Delete Document
         </button>
+        <a href="{{ url_for('documents') }}" class="btn btn-secondary">Back to List</a>
     </div>
 </div>
 
