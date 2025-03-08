@@ -3,30 +3,193 @@
 {% block title %}Upload Documents{% endblock %}
 
 {% block content %}
-<h1>Upload Documents</h1>
-<p class="lead">Upload PDF and Word documents to extract their content.</p>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-cloud-upload me-2"></i>Upload Documents</h2>
+    <a href="{{ url_for('documents') }}" class="btn btn-outline-primary">
+        <i class="bi bi-files me-1"></i> View Documents
+    </a>
+</div>
 
-<div class="card mb-4">
-    <div class="card-body">
-        <form method="POST" enctype="multipart/form-data">
-            <div class="mb-3">
-                <label for="file" class="form-label">Select files</label>
-                <input class="form-control" type="file" id="file" name="file" multiple accept=".pdf,.docx">
-                <div class="form-text">Supported formats: PDF, DOCX (Max size: 16MB)</div>
+<div class="row">
+    <div class="col-lg-7">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-upload me-2"></i>Select Files</h5>
             </div>
-            <div id="fileList" class="mb-3"></div>
-            <button type="submit" class="btn btn-primary">Upload and Process</button>
-        </form>
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data" class="upload-form">
+                    <div class="mb-4">
+                        <div class="upload-area p-5 mb-3 text-center border rounded bg-light">
+                            <i class="bi bi-file-earmark-arrow-up display-4 mb-3 text-primary"></i>
+                            <h5>Drag & Drop Files</h5>
+                            <p class="text-muted">or click to browse files</p>
+                            <input class="form-control d-none" type="file" id="file" name="file" multiple accept=".pdf,.docx">
+                        </div>
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div class="form-text">Supported formats: PDF, DOCX (Max size: 16MB)</div>
+                            <button type="button" class="btn btn-sm btn-outline-primary" id="browseButton">
+                                <i class="bi bi-folder2-open me-1"></i> Browse Files
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="fileList" class="mb-4"></div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="bi bi-cloud-upload me-1"></i> Upload and Process Files
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-5">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>Upload Information</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <i class="bi bi-lightbulb me-2"></i> Files will be processed immediately after upload
+                </div>
+                
+                <h6 class="mb-3">What happens after upload:</h6>
+                <ul class="list-group list-group-flush mb-4">
+                    <li class="list-group-item d-flex align-items-center">
+                        <i class="bi bi-check-circle-fill text-success me-2"></i>
+                        <div>
+                            <strong>Text Extraction</strong>
+                            <div class="text-muted small">Text will be extracted and stored in the database</div>
+                        </div>
+                    </li>
+                    <li class="list-group-item d-flex align-items-center">
+                        <i class="bi bi-check-circle-fill text-success me-2"></i>
+                        <div>
+                            <strong>Paragraph Analysis</strong>
+                            <div class="text-muted small">Content will be broken into meaningful paragraphs</div>
+                        </div>
+                    </li>
+                    <li class="list-group-item d-flex align-items-center">
+                        <i class="bi bi-check-circle-fill text-success me-2"></i>
+                        <div>
+                            <strong>File Storage</strong>
+                            <div class="text-muted small">Original files will be saved securely</div>
+                        </div>
+                    </li>
+                    <li class="list-group-item d-flex align-items-center">
+                        <i class="bi bi-check-circle-fill text-success me-2"></i>
+                        <div>
+                            <strong>Preview Generation</strong>
+                            <div class="text-muted small">Document previews will be prepared for viewing</div>
+                        </div>
+                    </li>
+                </ul>
+                
+                <div class="d-grid">
+                    <a href="{{ url_for('documents') }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-files me-1"></i> View Existing Documents
+                    </a>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
+{% endblock %}
 
-<div class="alert alert-info">
-    <h5>Upload Information</h5>
-    <ul>
-        <li>Files will be processed immediately after upload</li>
-        <li>Text will be extracted and stored in the database</li>
-        <li>Original files will be saved in the uploads folder</li>
-        <li>You can view the extracted text on the Documents page</li>
-    </ul>
-</div>
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const fileInput = document.getElementById('file');
+        const fileList = document.getElementById('fileList');
+        const browseButton = document.getElementById('browseButton');
+        const uploadArea = document.querySelector('.upload-area');
+        
+        // Click on the browse button triggers file input
+        browseButton.addEventListener('click', function() {
+            fileInput.click();
+        });
+        
+        // Click on the upload area also triggers file input
+        uploadArea.addEventListener('click', function() {
+            fileInput.click();
+        });
+        
+        // Handle file selection
+        fileInput.addEventListener('change', function() {
+            updateFileList();
+        });
+        
+        // Drag and drop functionality
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, preventDefaults, false);
+        });
+        
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        
+        ['dragenter', 'dragover'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, highlight, false);
+        });
+        
+        ['dragleave', 'drop'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, unhighlight, false);
+        });
+        
+        function highlight() {
+            uploadArea.classList.add('bg-primary', 'bg-opacity-10', 'border-primary');
+        }
+        
+        function unhighlight() {
+            uploadArea.classList.remove('bg-primary', 'bg-opacity-10', 'border-primary');
+        }
+        
+        uploadArea.addEventListener('drop', handleDrop, false);
+        
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            fileInput.files = dt.files;
+            updateFileList();
+        }
+        
+        function updateFileList() {
+            const fileCount = fileInput.files.length;
+            
+            if (fileCount > 0) {
+                let html = '<div class="alert alert-info mt-3">';
+                html += `<strong><i class="bi bi-file-earmark"></i> Selected ${fileCount} file${fileCount === 1 ? '' : 's'}:</strong>`;
+                html += '<ul class="list-group mt-2">';
+                
+                for (let i = 0; i < Math.min(fileCount, 10); i++) {
+                    const file = fileInput.files[i];
+                    const fileSize = (file.size / 1024).toFixed(2);
+                    const fileType = file.name.split('.').pop().toUpperCase();
+                    const icon = fileType === 'PDF' ? 'bi-file-earmark-pdf' : 'bi-file-earmark-word';
+                    
+                    html += `
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <i class="bi ${icon} me-2 text-primary"></i>
+                            ${file.name}
+                            <span class="badge bg-secondary ms-2">${fileType}</span>
+                        </div>
+                        <span class="text-muted">${fileSize} KB</span>
+                    </li>`;
+                }
+                
+                if (fileCount > 10) {
+                    html += `<li class="list-group-item text-center">...and ${fileCount - 10} more files</li>`;
+                }
+                
+                html += '</ul></div>';
+                fileList.innerHTML = html;
+            } else {
+                fileList.innerHTML = '';
+            }
+        }
+    });
+</script>
 {% endblock %}

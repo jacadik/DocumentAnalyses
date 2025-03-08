@@ -1,44 +1,159 @@
 {% extends "base.html" %}
 
-{% block title %}Document Analyzer - Home{% endblock %}
+{% block title %}Document Analyzer - Intelligent Content Analysis Tool{% endblock %}
 
 {% block content %}
-<div class="jumbotron bg-light p-5 rounded">
-    <h1 class="display-4">Document Analyzer</h1>
-    <p class="lead">A lightweight tool for analyzing document templates in migration projects.</p>
-    <hr class="my-4">
-    <p>Upload PDF and Word documents to extract and analyze their content.</p>
-    <div class="mt-4">
-        <a class="btn btn-primary btn-lg me-2" href="{{ url_for('upload') }}" role="button">Upload Documents</a>
-        <a class="btn btn-secondary btn-lg" href="{{ url_for('documents') }}" role="button">View Documents</a>
+<div class="hero-section">
+    <div class="hero-content">
+        <h1 class="hero-title">Document Analyzer</h1>
+        <p class="hero-subtitle">Powerful content analysis tool for document management and migration projects</p>
+        <div class="hero-actions">
+            <a class="btn btn-light btn-lg me-2" href="{{ url_for('upload') }}">
+                <i class="bi bi-cloud-upload me-1"></i> Upload Documents
+            </a>
+            <a class="btn btn-outline-light btn-lg" href="{{ url_for('documents') }}">
+                <i class="bi bi-files me-1"></i> View Documents
+            </a>
+        </div>
     </div>
 </div>
 
-<div class="row mt-5">
+<div class="row">
     <div class="col-md-4 mb-4">
-        <div class="card h-100">
-            <div class="card-body">
-                <h5 class="card-title">Document Upload</h5>
-                <p class="card-text">Upload PDF and Word documents to extract their text content.</p>
-                <a href="{{ url_for('upload') }}" class="btn btn-primary">Upload</a>
+        <div class="card feature-card animate-fade-in-up">
+            <div class="card-body text-center">
+                <div class="feature-icon">
+                    <i class="bi bi-cloud-upload"></i>
+                </div>
+                <h5 class="card-title">Upload & Extract</h5>
+                <p class="card-text">Upload PDF and Word documents to automatically extract text content with high accuracy.</p>
+                <a href="{{ url_for('upload') }}" class="btn btn-primary">Upload Documents</a>
             </div>
         </div>
     </div>
     <div class="col-md-4 mb-4">
-        <div class="card h-100">
-            <div class="card-body">
-                <h5 class="card-title">Document List</h5>
-                <p class="card-text">View all uploaded documents and their extraction status.</p>
-                <a href="{{ url_for('documents') }}" class="btn btn-primary">View Documents</a>
+        <div class="card feature-card animate-fade-in-up">
+            <div class="card-body text-center">
+                <div class="feature-icon">
+                    <i class="bi bi-diagram-3"></i>
+                </div>
+                <h5 class="card-title">Analyze & Compare</h5>
+                <p class="card-text">Discover similarities between documents, analyze paragraph-level content, and identify patterns.</p>
+                <a href="{{ url_for('similarity_map') }}" class="btn btn-primary">Content Map</a>
             </div>
         </div>
     </div>
     <div class="col-md-4 mb-4">
+        <div class="card feature-card animate-fade-in-up">
+            <div class="card-body text-center">
+                <div class="feature-icon">
+                    <i class="bi bi-file-earmark-spreadsheet"></i>
+                </div>
+                <h5 class="card-title">Export & Share</h5>
+                <p class="card-text">Generate comprehensive Excel reports for document content, paragraphs, and similarities.</p>
+                <a href="{{ url_for('export') }}" class="btn btn-primary">Export Reports</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-6">
         <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Key Features</h5>
+                <span class="badge bg-primary">New</span>
+            </div>
             <div class="card-body">
-                <h5 class="card-title">Export to Excel</h5>
-                <p class="card-text">Generate an Excel report of all processed documents.</p>
-                <a href="{{ url_for('export') }}" class="btn btn-primary">Export</a>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item d-flex align-items-center">
+                        <i class="bi bi-check-circle-fill text-success me-2"></i>
+                        <div>
+                            <strong>Intelligent Content Extraction</strong>
+                            <div class="text-muted small">Advanced extraction from PDF and Word documents</div>
+                        </div>
+                    </li>
+                    <li class="list-group-item d-flex align-items-center">
+                        <i class="bi bi-check-circle-fill text-success me-2"></i>
+                        <div>
+                            <strong>Paragraph-Level Analysis</strong>
+                            <div class="text-muted small">Identify shared content across documents</div>
+                        </div>
+                    </li>
+                    <li class="list-group-item d-flex align-items-center">
+                        <i class="bi bi-check-circle-fill text-success me-2"></i>
+                        <div>
+                            <strong>Document Similarity</strong>
+                            <div class="text-muted small">Discover relationships with interactive visualization</div>
+                        </div>
+                    </li>
+                    <li class="list-group-item d-flex align-items-center">
+                        <i class="bi bi-check-circle-fill text-success me-2"></i>
+                        <div>
+                            <strong>Tagging System</strong>
+                            <div class="text-muted small">Organize content with customizable tags</div>
+                        </div>
+                    </li>
+                    <li class="list-group-item d-flex align-items-center">
+                        <i class="bi bi-check-circle-fill text-success me-2"></i>
+                        <div>
+                            <strong>Excel Reports</strong>
+                            <div class="text-muted small">Generate detailed analysis reports</div>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0">Getting Started</h5>
+            </div>
+            <div class="card-body">
+                <div class="steps">
+                    <div class="step d-flex mb-4">
+                        <div class="step-number me-3">
+                            <span class="badge rounded-pill bg-primary" style="width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;">1</span>
+                        </div>
+                        <div class="step-content">
+                            <h6>Upload Documents</h6>
+                            <p class="text-muted">Upload PDF or Word documents through the upload page. The system will automatically extract text content.</p>
+                        </div>
+                    </div>
+                    <div class="step d-flex mb-4">
+                        <div class="step-number me-3">
+                            <span class="badge rounded-pill bg-primary" style="width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;">2</span>
+                        </div>
+                        <div class="step-content">
+                            <h6>Review Documents</h6>
+                            <p class="text-muted">View extracted content, preview document pages, and examine paragraph-level analysis.</p>
+                        </div>
+                    </div>
+                    <div class="step d-flex mb-4">
+                        <div class="step-number me-3">
+                            <span class="badge rounded-pill bg-primary" style="width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;">3</span>
+                        </div>
+                        <div class="step-content">
+                            <h6>Analyze Relationships</h6>
+                            <p class="text-muted">Use the Content Map to calculate and visualize document similarities. Compare documents side by side.</p>
+                        </div>
+                    </div>
+                    <div class="step d-flex">
+                        <div class="step-number me-3">
+                            <span class="badge rounded-pill bg-primary" style="width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;">4</span>
+                        </div>
+                        <div class="step-content">
+                            <h6>Export Results</h6>
+                            <p class="text-muted">Generate comprehensive Excel reports with document content, paragraphs, and analysis results.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer">
+                <a href="{{ url_for('upload') }}" class="btn btn-primary">
+                    <i class="bi bi-arrow-right"></i> Start Now
+                </a>
             </div>
         </div>
     </div>

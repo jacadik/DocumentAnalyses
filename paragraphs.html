@@ -2,59 +2,188 @@
 
 {% block title %}Paragraph Analysis{% endblock %}
 
+{% block extra_css %}
+<style>
+    .paragraph-content {
+        max-height: 120px;
+        overflow-y: auto;
+        background-color: #f8f9fa;
+        padding: 1rem;
+        border-radius: 0.25rem;
+        border-left: 3px solid #4361ee;
+    }
+    .document-badge {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 150px;
+        display: inline-block;
+        margin-bottom: 5px;
+    }
+    .highlight-row {
+        animation: highlight-fade 2s ease-in-out;
+    }
+    @keyframes highlight-fade {
+        0% { background-color: rgba(67, 97, 238, 0.2); }
+        100% { background-color: transparent; }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h1>Paragraph Analysis</h1>
+    <h2><i class="bi bi-text-paragraph me-2"></i>Paragraph Analysis</h2>
     <div>
-        <a href="{{ url_for('documents') }}" class="btn btn-secondary me-2">Back to Documents</a>
-        <a href="{{ url_for('export_paragraphs') }}" class="btn btn-success">Export Paragraphs</a>
+        <a href="{{ url_for('documents') }}" class="btn btn-secondary me-2">
+            <i class="bi bi-files me-1"></i> Back to Documents
+        </a>
+        <a href="{{ url_for('export_paragraphs') }}" class="btn btn-success">
+            <i class="bi bi-file-earmark-spreadsheet me-1"></i> Export Paragraphs
+        </a>
     </div>
 </div>
 
 {% if paragraphs %}
-<div class="alert alert-info">
-    Found {{ paragraphs|length }} unique paragraphs across all documents.
+<div class="alert alert-info d-flex align-items-center">
+    <i class="bi bi-info-circle-fill me-3 fs-4"></i>
+    <div>
+        <strong>Analysis Summary:</strong> Found {{ paragraphs|length }} unique paragraphs across all documents.
+        {% if shared_paragraphs|length > 0 %}
+        <span class="badge bg-primary ms-2">{{ shared_paragraphs|length }} shared paragraphs</span>
+        {% endif %}
+    </div>
 </div>
 
-<div class="card mb-4">
-    <div class="card-header bg-light">
-        <div class="d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">Shared Paragraphs</h5>
-            <small class="text-muted">Showing paragraphs that appear in multiple documents</small>
+<div class="row mb-4">
+    <div class="col-lg-8">
+        <div class="card mb-4">
+            <div class="card-header bg-light">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-intersect me-2"></i>Shared Paragraphs</h5>
+                    <div class="form-check form-switch d-flex align-items-center">
+                        <input class="form-check-input me-2" type="checkbox" id="sortByCountSwitch" checked>
+                        <label class="form-check-label" for="sortByCountSwitch">Sort by document count</label>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                {% if shared_paragraphs %}
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0" id="sharedParagraphsTable">
+                        <thead class="table-light">
+                            <tr>
+                                <th width="5%">ID</th>
+                                <th width="50%">Paragraph Content</th>
+                                <th width="10%" class="text-center">Count</th>
+                                <th width="35%">Documents</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for para in shared_paragraphs %}
+                            <tr data-document-count="{{ para.documents|length }}">
+                                <td>{{ para.id }}</td>
+                                <td>
+                                    <div class="paragraph-content">
+                                        {{ para.content[:500] }}{% if para.content|length > 500 %}...{% endif %}
+                                    </div>
+                                    <div class="mt-2">
+                                        {% for tag in para.get_tags() %}
+                                        <span class="badge" style="background-color: {{ tag.color }}">{{ tag.name }}</span>
+                                        {% endfor %}
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge bg-primary rounded-pill fs-6">{{ para.documents|length }}</span>
+                                </td>
+                                <td>
+                                    <div class="document-links">
+                                        {% for doc in para.documents %}
+                                        <a href="{{ url_for('view_document', id=doc.id) }}" class="badge bg-light text-dark border document-badge">
+                                            {% if doc.file_type == 'pdf' %}
+                                            <i class="bi bi-file-earmark-pdf text-danger"></i>
+                                            {% elif doc.file_type == 'docx' %}
+                                            <i class="bi bi-file-earmark-word text-primary"></i>
+                                            {% else %}
+                                            <i class="bi bi-file-earmark-text"></i>
+                                            {% endif %}
+                                            {{ doc.original_filename }}
+                                        </a>
+                                        {% endfor %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info m-3">
+                    <i class="bi bi-info-circle me-2"></i> No shared paragraphs found across documents.
+                </div>
+                {% endif %}
+            </div>
         </div>
     </div>
-    <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-striped table-hover mb-0">
-                <thead class="table-light">
-                    <tr>
-                        <th>ID</th>
-                        <th>Paragraph Content</th>
-                        <th>Document Count</th>
-                        <th>Documents</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for para in shared_paragraphs %}
-                    <tr>
-                        <td>{{ para.id }}</td>
-                        <td>
-                            <div style="max-height: 100px; overflow-y: auto;">
-                                {{ para.content[:500] }}{% if para.content|length > 500 %}...{% endif %}
+    
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-header bg-light">
+                <h5 class="mb-0"><i class="bi bi-graph-up me-2"></i>Paragraph Analysis</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-4">
+                    <h6 class="mb-3">Distribution by Document Count</h6>
+                    <div class="progress-stacked mb-3">
+                        {% set unique_count = 0 %}
+                        {% for para in paragraphs %}
+                            {% if para.documents|count == 1 %}
+                                {% set unique_count = unique_count + 1 %}
+                            {% endif %}
+                        {% endfor %}
+                        {% set shared_count = paragraphs|length - unique_count %}
+                        
+                        {% if paragraphs|length > 0 %}
+                            {% set percent_unique = (unique_count / paragraphs|length * 100)|round %}
+                            {% set percent_shared = (shared_count / paragraphs|length * 100)|round %}
+                        {% else %}
+                            {% set percent_unique = 0 %}
+                            {% set percent_shared = 0 %}
+                        {% endif %}
+                        
+                        <div class="progress" role="progressbar" style="height: 20px;">
+                            <div class="progress-bar bg-secondary" style="width: {{ percent_unique }}%" 
+                                 title="Unique paragraphs: {{ unique_count }}">{{ percent_unique }}%</div>
+                            <div class="progress-bar bg-primary" style="width: {{ percent_shared }}%" 
+                                 title="Shared paragraphs: {{ shared_count }}">{{ percent_shared }}%</div>
+                        </div>
+                        <div class="d-flex justify-content-between mt-1">
+                            <small>Unique: {{ unique_count }} ({{ percent_unique }}%)</small>
+                            <small>Shared: {{ shared_count }} ({{ percent_shared }}%)</small>
+                        </div>
+                    </div>
+                    
+                    {% if shared_paragraphs %}
+                    <h6 class="mb-2">Top Shared Content</h6>
+                    <div class="list-group list-group-flush">
+                        {% for para in shared_paragraphs[:3] %}
+                        <div class="list-group-item px-0">
+                            <div class="d-flex justify-content-between align-items-start mb-1">
+                                <span class="badge bg-primary">{{ para.documents|length }} documents</span>
+                                <button class="btn btn-sm btn-link p-0" onclick="highlightParagraph({{ para.id }})">
+                                    <i class="bi bi-eye"></i>
+                                </button>
                             </div>
-                        </td>
-                        <td>{{ para.documents|length }}</td>
-                        <td>
-                            {% for doc in para.documents %}
-                            <a href="{{ url_for('view_document', id=doc.id) }}" class="badge bg-primary text-decoration-none me-1">
-                                {{ doc.original_filename }}
-                            </a>
-                            {% endfor %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                            <div class="small text-truncate">{{ para.content[:100] }}...</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <div class="alert alert-info">
+                    <i class="bi bi-lightbulb me-2"></i> <strong>Tip:</strong> Shared paragraphs indicate content reused across multiple documents. This can help identify common sections, standard clauses, or templates.
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -62,39 +191,58 @@
 <div class="card">
     <div class="card-header bg-light">
         <div class="d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">All Paragraphs</h5>
-            <form class="d-flex">
-                <input class="form-control me-2" type="search" placeholder="Search paragraphs..." id="paragraphSearch">
-            </form>
+            <h5 class="mb-0"><i class="bi bi-list-ul me-2"></i>All Paragraphs</h5>
+            <div class="d-flex">
+                <div class="input-group">
+                    <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                    <input class="form-control border-start-0" type="search" placeholder="Search paragraphs..." id="paragraphSearch">
+                </div>
+            </div>
         </div>
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-striped table-hover mb-0" id="paragraphTable">
+            <table class="table table-hover align-middle mb-0" id="paragraphTable">
                 <thead class="table-light">
                     <tr>
-                        <th>ID</th>
-                        <th>Paragraph Content</th>
-                        <th>Document Count</th>
-                        <th>Documents</th>
+                        <th width="5%">ID</th>
+                        <th width="55%">Paragraph Content</th>
+                        <th width="10%" class="text-center">Count</th>
+                        <th width="30%">Documents</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for para in paragraphs %}
-                    <tr>
+                    <tr id="paragraph-{{ para.id }}">
                         <td>{{ para.id }}</td>
                         <td>
-                            <div style="max-height: 100px; overflow-y: auto;">
+                            <div class="paragraph-content">
                                 {{ para.content[:500] }}{% if para.content|length > 500 %}...{% endif %}
                             </div>
+                            <div class="mt-2">
+                                {% for tag in para.get_tags() %}
+                                <span class="badge" style="background-color: {{ tag.color }}">{{ tag.name }}</span>
+                                {% endfor %}
+                            </div>
                         </td>
-                        <td>{{ para.documents|length }}</td>
+                        <td class="text-center">
+                            <span class="badge {{ 'bg-primary' if para.documents|length > 1 else 'bg-secondary' }} rounded-pill">{{ para.documents|length }}</span>
+                        </td>
                         <td>
-                            {% for doc in para.documents %}
-                            <a href="{{ url_for('view_document', id=doc.id) }}" class="badge bg-primary text-decoration-none me-1">
-                                {{ doc.original_filename }}
-                            </a>
-                            {% endfor %}
+                            <div class="document-links">
+                                {% for doc in para.documents %}
+                                <a href="{{ url_for('view_document', id=doc.id) }}" class="badge bg-light text-dark border document-badge mb-1">
+                                    {% if doc.file_type == 'pdf' %}
+                                    <i class="bi bi-file-earmark-pdf text-danger"></i>
+                                    {% elif doc.file_type == 'docx' %}
+                                    <i class="bi bi-file-earmark-word text-primary"></i>
+                                    {% else %}
+                                    <i class="bi bi-file-earmark-text"></i>
+                                    {% endif %}
+                                    {{ doc.original_filename }}
+                                </a>
+                                {% endfor %}
+                            </div>
                         </td>
                     </tr>
                     {% endfor %}
@@ -102,15 +250,45 @@
             </table>
         </div>
     </div>
+    <div class="card-footer bg-light">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <span class="text-muted">Showing {{ paragraphs|length }} paragraphs</span>
+            </div>
+            <div>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="exportBtn">
+                    <i class="bi bi-file-earmark-spreadsheet me-1"></i> Export
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
 {% else %}
-<div class="alert alert-info">
-    No paragraphs found. <a href="{{ url_for('upload') }}">Upload documents</a> to analyze paragraphs.
+<div class="alert alert-info d-flex align-items-center">
+    <i class="bi bi-info-circle-fill fs-3 me-3"></i>
+    <div>
+        <h5>No paragraphs found</h5>
+        <p class="mb-0">Upload some documents to get started with paragraph analysis and comparison.</p>
+    </div>
+</div>
+
+<div class="text-center py-5">
+    <div class="mb-4">
+        <i class="bi bi-cloud-upload display-1 text-muted"></i>
+    </div>
+    <h3>Ready to analyze your documents?</h3>
+    <p class="text-muted mb-4">Upload PDF or Word files to start extracting and analyzing content.</p>
+    <a href="{{ url_for('upload') }}" class="btn btn-primary btn-lg">
+        <i class="bi bi-upload me-1"></i> Upload Documents
+    </a>
 </div>
 {% endif %}
+{% endblock %}
 
+{% block extra_js %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // Search functionality
         const searchInput = document.getElementById('paragraphSearch');
         const table = document.getElementById('paragraphTable');
         
@@ -127,6 +305,59 @@
                         row.style.display = 'none';
                     }
                 });
+            });
+        }
+        
+        // Sort shared paragraphs by document count
+        const sortSwitch = document.getElementById('sortByCountSwitch');
+        const sharedTable = document.getElementById('sharedParagraphsTable');
+        
+        if (sortSwitch && sharedTable) {
+            function sortTableByCount() {
+                const tbody = sharedTable.querySelector('tbody');
+                const rows = Array.from(tbody.querySelectorAll('tr'));
+                
+                // Sort rows by document count
+                rows.sort((a, b) => {
+                    const countA = parseInt(a.getAttribute('data-document-count'));
+                    const countB = parseInt(b.getAttribute('data-document-count'));
+                    
+                    return sortSwitch.checked ? countB - countA : countA - countB;
+                });
+                
+                // Remove all rows
+                rows.forEach(row => tbody.removeChild(row));
+                
+                // Add sorted rows
+                rows.forEach(row => tbody.appendChild(row));
+            }
+            
+            // Initial sort
+            sortTableByCount();
+            
+            // Sort on checkbox change
+            sortSwitch.addEventListener('change', sortTableByCount);
+        }
+        
+        // Highlight paragraph function
+        window.highlightParagraph = function(id) {
+            const paragraphRow = document.getElementById(`paragraph-${id}`);
+            if (paragraphRow) {
+                // Scroll to the paragraph
+                paragraphRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                
+                // Add highlighting animation
+                paragraphRow.classList.remove('highlight-row');
+                void paragraphRow.offsetWidth; // Trigger reflow
+                paragraphRow.classList.add('highlight-row');
+            }
+        };
+        
+        // Export button functionality
+        const exportBtn = document.getElementById('exportBtn');
+        if (exportBtn) {
+            exportBtn.addEventListener('click', function() {
+                window.location.href = "{{ url_for('export_paragraphs') }}";
             });
         }
     });

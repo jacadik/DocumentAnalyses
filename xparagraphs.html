@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+
+{% block title %}Paragraph Analysis{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Paragraph Analysis</h1>
+    <div>
+        <a href="{{ url_for('documents') }}" class="btn btn-secondary me-2">Back to Documents</a>
+        <a href="{{ url_for('export_paragraphs') }}" class="btn btn-success">Export Paragraphs</a>
+    </div>
+</div>
+
+{% if paragraphs %}
+<div class="alert alert-info">
+    Found {{ paragraphs|length }} unique paragraphs across all documents.
+</div>
+
+<div class="card mb-4">
+    <div class="card-header bg-light">
+        <div class="d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Shared Paragraphs</h5>
+            <small class="text-muted">Showing paragraphs that appear in multiple documents</small>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>ID</th>
+                        <th>Paragraph Content</th>
+                        <th>Document Count</th>
+                        <th>Documents</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for para in shared_paragraphs %}
+                    <tr>
+                        <td>{{ para.id }}</td>
+                        <td>
+                            <div style="max-height: 100px; overflow-y: auto;">
+                                {{ para.content[:500] }}{% if para.content|length > 500 %}...{% endif %}
+                            </div>
+                        </td>
+                        <td>{{ para.documents|length }}</td>
+                        <td>
+                            {% for doc in para.documents %}
+                            <a href="{{ url_for('view_document', id=doc.id) }}" class="badge bg-primary text-decoration-none me-1">
+                                {{ doc.original_filename }}
+                            </a>
+                            {% endfor %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header bg-light">
+        <div class="d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">All Paragraphs</h5>
+            <form class="d-flex">
+                <input class="form-control me-2" type="search" placeholder="Search paragraphs..." id="paragraphSearch">
+            </form>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover mb-0" id="paragraphTable">
+                <thead class="table-light">
+                    <tr>
+                        <th>ID</th>
+                        <th>Paragraph Content</th>
+                        <th>Document Count</th>
+                        <th>Documents</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for para in paragraphs %}
+                    <tr>
+                        <td>{{ para.id }}</td>
+                        <td>
+                            <div style="max-height: 100px; overflow-y: auto;">
+                                {{ para.content[:500] }}{% if para.content|length > 500 %}...{% endif %}
+                            </div>
+                        </td>
+                        <td>{{ para.documents|length }}</td>
+                        <td>
+                            {% for doc in para.documents %}
+                            <a href="{{ url_for('view_document', id=doc.id) }}" class="badge bg-primary text-decoration-none me-1">
+                                {{ doc.original_filename }}
+                            </a>
+                            {% endfor %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="alert alert-info">
+    No paragraphs found. <a href="{{ url_for('upload') }}">Upload documents</a> to analyze paragraphs.
+</div>
+{% endif %}
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const searchInput = document.getElementById('paragraphSearch');
+        const table = document.getElementById('paragraphTable');
+        
+        if (searchInput && table) {
+            searchInput.addEventListener('keyup', function() {
+                const searchTerm = this.value.toLowerCase();
+                const rows = table.querySelectorAll('tbody tr');
+                
+                rows.forEach(row => {
+                    const text = row.textContent.toLowerCase();
+                    if (text.includes(searchTerm)) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+            });
+        }
+    });
+</script>
+{% endblock %}

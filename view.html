@@ -2,265 +2,407 @@
 
 {% block title %}Document Details - {{ document.original_filename }}{% endblock %}
 
+{% block extra_css %}
+<style>
+    .document-preview {
+        max-height: 800px;
+        overflow: hidden;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+        border-radius: 0.5rem;
+        transition: all 0.3s ease;
+    }
+    
+    .document-preview:hover {
+        transform: scale(1.01);
+    }
+    
+    .preview-pagination .page-link {
+        width: 36px;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 500;
+    }
+    
+    .paragraph-content {
+        border-left: 3px solid #4361ee;
+        padding: 1rem;
+        background-color: #f8f9fa;
+        border-radius: 0.25rem;
+    }
+    
+    .tag-item {
+        display: inline-block;
+        margin-right: 5px;
+        margin-bottom: 5px;
+    }
+    
+    .document-metadata dt {
+        font-weight: 500;
+        color: #495057;
+    }
+    
+    .document-metadata dd {
+        margin-bottom: 0.75rem;
+    }
+    
+    .similar-doc {
+        transition: all 0.3s ease;
+    }
+    
+    .similar-doc:hover {
+        transform: translateX(5px);
+    }
+    
+    .accordion-button:not(.collapsed)::after {
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%234361ee'%3e%3cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3e%3c/svg%3e");
+    }
+    
+    .section-card {
+        border-top: 4px solid #4361ee;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h1>Document Details</h1>
+    <h2><i class="bi bi-file-earmark-text me-2"></i>Document Details</h2>
     <div>
         <button type="button" class="btn btn-danger me-2" 
                 data-bs-toggle="modal" 
                 data-bs-target="#deleteModal" 
                 data-doc-id="{{ document.id }}"
                 data-doc-name="{{ document.original_filename }}">
-            Delete Document
+            <i class="bi bi-trash me-1"></i> Delete Document
         </button>
-        <a href="{{ url_for('documents') }}" class="btn btn-secondary">Back to List</a>
+        <a href="{{ url_for('documents') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left me-1"></i> Back to List
+        </a>
     </div>
 </div>
 
-<div class="card mb-4">
-    <div class="card-header bg-light">
-        <h5 class="card-title mb-0">{{ document.original_filename }}</h5>
-    </div>
-    <div class="card-body">
-        <div class="row">
-            <div class="col-md-6">
-                <p><strong>ID:</strong> {{ document.id }}</p>
-                <p><strong>Original Filename:</strong> {{ document.original_filename }}</p>
-                <p><strong>Stored Filename:</strong> {{ document.filename }}</p>
-                <p><strong>File Type:</strong> {{ document.file_type.upper() }}</p>
-                <p><strong>Page Count:</strong> {{ document.page_count }} pages</p>
-                <p>
-                    <strong>Tags:</strong>
-                    {% for tag in document.get_tags() %}
-                    <span class="badge" style="background-color: {{ tag.color }}">{{ tag.name }}</span>
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card mb-4 section-card">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    {% if document.file_type == 'pdf' %}
+                    <i class="bi bi-file-earmark-pdf text-danger me-2"></i>
+                    {% elif document.file_type == 'docx' %}
+                    <i class="bi bi-file-earmark-word text-primary me-2"></i>
                     {% else %}
-                    <span class="text-muted">No tags</span>
-                    {% endfor %}
-                    <button type="button" class="btn btn-sm btn-outline-primary ms-2" 
-                            data-bs-toggle="modal" data-bs-target="#tagDocumentModal">
-                        <i class="bi bi-tag"></i> Manage Tags
-                    </button>
-                </p>
-            </div>
-            <div class="col-md-6">
-                <p><strong>File Size:</strong> {{ (document.file_size / 1024) | round(2) }} KB</p>
-                <p><strong>Upload Date:</strong> {{ document.upload_date.strftime('%Y-%m-%d %H:%M:%S') }}</p>
-                <p><strong>Paragraph Count:</strong> {{ document.paragraph_count }} paragraphs</p>
-                <p>
-                    <strong>Status:</strong> 
-                    {% if document.status == 'processed' %}
-                    <span class="badge bg-success">{{ document.status }}</span>
-                    {% elif document.status == 'error' %}
-                    <span class="badge bg-danger">{{ document.status }}</span>
-                    {% else %}
-                    <span class="badge bg-warning text-dark">{{ document.status }}</span>
+                    <i class="bi bi-file-earmark-text me-2"></i>
                     {% endif %}
-                </p>
+                    {{ document.original_filename }}
+                </h5>
+                <div>
+                    {% if document.status == 'processed' %}
+                    <span class="badge bg-success">
+                        <i class="bi bi-check-circle me-1"></i> {{ document.status }}
+                    </span>
+                    {% elif document.status == 'error' %}
+                    <span class="badge bg-danger">
+                        <i class="bi bi-exclamation-triangle me-1"></i> {{ document.status }}
+                    </span>
+                    {% else %}
+                    <span class="badge bg-warning text-dark">
+                        <i class="bi bi-hourglass-split me-1"></i> {{ document.status }}
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <dl class="document-metadata">
+                            <dt><i class="bi bi-hash me-1"></i> Document ID</dt>
+                            <dd>{{ document.id }}</dd>
+                            
+                            <dt><i class="bi bi-file-earmark me-1"></i> File Type</dt>
+                            <dd>{{ document.file_type.upper() }}</dd>
+                            
+                            <dt><i class="bi bi-arrows-fullscreen me-1"></i> File Size</dt>
+                            <dd>{{ (document.file_size / 1024) | round(2) }} KB</dd>
+                            
+                            <dt><i class="bi bi-file-earmark-break me-1"></i> Page Count</dt>
+                            <dd>{{ document.page_count }} pages</dd>
+                        </dl>
+                    </div>
+                    <div class="col-md-6">
+                        <dl class="document-metadata">
+                            <dt><i class="bi bi-calendar me-1"></i> Upload Date</dt>
+                            <dd>{{ document.upload_date.strftime('%Y-%m-%d %H:%M') }}</dd>
+                            
+                            <dt><i class="bi bi-text-paragraph me-1"></i> Paragraph Count</dt>
+                            <dd>{{ document.paragraph_count }} paragraphs</dd>
+                            
+                            <dt><i class="bi bi-file-earmark-arrow-down me-1"></i> Stored Filename</dt>
+                            <dd class="text-truncate" title="{{ document.filename }}">{{ document.filename }}</dd>
+                            
+                            <dt><i class="bi bi-tags me-1"></i> Tags</dt>
+                            <dd>
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        {% for tag in document.get_tags() %}
+                                        <span class="badge tag-item" style="background-color: {{ tag.color }}">
+                                            {{ tag.name }}
+                                        </span>
+                                        {% else %}
+                                        <span class="text-muted">No tags</span>
+                                        {% endfor %}
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" 
+                                            data-bs-toggle="modal" data-bs-target="#tagDocumentModal">
+                                        <i class="bi bi-tag me-1"></i> Manage Tags
+                                    </button>
+                                </div>
+                            </dd>
+                        </dl>
+                    </div>
+                </div>
+                
                 {% if document.status == 'error' %}
                 <div class="alert alert-danger">
-                    <strong>Error:</strong> {{ document.error_message }}
+                    <h6 class="alert-heading"><i class="bi bi-exclamation-triangle-fill me-2"></i>Error Details:</h6>
+                    <p>{{ document.error_message }}</p>
                 </div>
                 {% endif %}
             </div>
         </div>
-    </div>
-</div>
-
-{% if total_pages > 0 %}
-<div class="card mb-4">
-    <div class="card-header bg-light d-flex justify-content-between align-items-center">
-        <h5 class="mb-0">Document Preview</h5>
-        <div class="d-flex align-items-center">
-            {% if document.file_type == 'pdf' %}
-            <span class="badge bg-info me-3">Page {{ current_page }} of {{ total_pages }}</span>
-            {% else %}
-            <span class="badge bg-info me-3">Section {{ current_page }} of {{ total_pages }}</span>
-            {% endif %}
+        
+        {% if total_pages > 0 %}
+        <div class="card mb-4 section-card">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-file-earmark-richtext me-2"></i>Document Preview</h5>
+                <div class="d-flex align-items-center">
+                    {% if document.file_type == 'pdf' %}
+                    <span class="badge bg-primary me-3">Page {{ current_page }} of {{ total_pages }}</span>
+                    {% else %}
+                    <span class="badge bg-primary me-3">Section {{ current_page }} of {{ total_pages }}</span>
+                    {% endif %}
+                    
+                    {% if total_pages > 1 %}
+                    <nav aria-label="Preview navigation" class="preview-pagination">
+                        <ul class="pagination pagination-sm mb-0">
+                            <li class="page-item {% if current_page == 1 %}disabled{% endif %}">
+                                <a class="page-link" href="{{ url_for('view_document', id=document.id, page=current_page-1) if current_page > 1 else '#' }}" aria-label="Previous">
+                                    <span aria-hidden="true">&laquo;</span>
+                                </a>
+                            </li>
+                            
+                            {% for page_num in range(1, total_pages + 1) %}
+                                {% if page_num == 1 or page_num == total_pages or (page_num >= current_page - 2 and page_num <= current_page + 2) %}
+                                <li class="page-item {% if page_num == current_page %}active{% endif %}">
+                                    <a class="page-link" href="{{ url_for('view_document', id=document.id, page=page_num) }}">{{ page_num }}</a>
+                                </li>
+                                {% elif page_num == current_page - 3 or page_num == current_page + 3 %}
+                                <li class="page-item disabled">
+                                    <a class="page-link" href="#">...</a>
+                                </li>
+                                {% endif %}
+                            {% endfor %}
+                            
+                            <li class="page-item {% if current_page == total_pages %}disabled{% endif %}">
+                                <a class="page-link" href="{{ url_for('view_document', id=document.id, page=current_page+1) if current_page < total_pages else '#' }}" aria-label="Next">
+                                    <span aria-hidden="true">&raquo;</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </nav>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="document-preview-container p-3 text-center">
+                    {% if current_page <= total_pages %}
+                    <img src="{{ url_for('generate_preview', document_id=document.id, page_number=current_page) }}" 
+                         alt="Document Preview - Page {{ current_page }}" 
+                         class="document-preview img-fluid border rounded shadow" 
+                         style="max-height: 800px;">
+                    {% else %}
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle me-2"></i> Preview not available for this page.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
             
             {% if total_pages > 1 %}
-            <nav aria-label="Preview navigation">
-                <ul class="pagination pagination-sm mb-0">
-                    <li class="page-item {% if current_page == 1 %}disabled{% endif %}">
-                        <a class="page-link" href="{{ url_for('view_document', id=document.id, page=current_page-1) if current_page > 1 else '#' }}" aria-label="Previous">
-                            <span aria-hidden="true">&laquo;</span>
-                        </a>
-                    </li>
-                    
-                    {% for page_num in range(1, total_pages + 1) %}
-                    <li class="page-item {% if page_num == current_page %}active{% endif %}">
-                        <a class="page-link" href="{{ url_for('view_document', id=document.id, page=page_num) }}">{{ page_num }}</a>
-                    </li>
-                    {% endfor %}
-                    
-                    <li class="page-item {% if current_page == total_pages %}disabled{% endif %}">
-                        <a class="page-link" href="{{ url_for('view_document', id=document.id, page=current_page+1) if current_page < total_pages else '#' }}" aria-label="Next">
-                            <span aria-hidden="true">&raquo;</span>
-                        </a>
-                    </li>
-                </ul>
-            </nav>
+            <div class="card-footer bg-light">
+                <div class="d-flex justify-content-between align-items-center">
+                    <a href="{{ url_for('view_document', id=document.id, page=current_page-1) }}" class="btn btn-outline-primary {% if current_page == 1 %}disabled{% endif %}">
+                        <i class="bi bi-arrow-left me-1"></i> Previous
+                    </a>
+                    <div class="text-center">
+                        <div class="btn-group" role="group">
+                            <a href="{{ url_for('view_document', id=document.id, page=1) }}" class="btn btn-outline-secondary {% if current_page == 1 %}disabled{% endif %}">
+                                <i class="bi bi-chevron-double-left"></i>
+                            </a>
+                            <button type="button" class="btn btn-outline-secondary">
+                                {{ current_page }} / {{ total_pages }}
+                            </button>
+                            <a href="{{ url_for('view_document', id=document.id, page=total_pages) }}" class="btn btn-outline-secondary {% if current_page == total_pages %}disabled{% endif %}">
+                                <i class="bi bi-chevron-double-right"></i>
+                            </a>
+                        </div>
+                    </div>
+                    <a href="{{ url_for('view_document', id=document.id, page=current_page+1) }}" class="btn btn-outline-primary {% if current_page == total_pages %}disabled{% endif %}">
+                        Next <i class="bi bi-arrow-right ms-1"></i>
+                    </a>
+                </div>
+            </div>
             {% endif %}
         </div>
-    </div>
-    <div class="card-body text-center">
-        {% if current_page <= total_pages %}
-        <img src="{{ url_for('generate_preview', document_id=document.id, page_number=current_page) }}" 
-             alt="Document Preview - Page {{ current_page }}" 
-             class="img-fluid border rounded shadow" 
-             style="max-height: 800px;">
-        {% else %}
-        <div class="alert alert-info">
-            Preview not available for this page.
+        {% endif %}
+        
+        {% if document.status == 'processed' %}
+        <div class="card section-card">
+            <div class="card-header bg-light">
+                <h5 class="mb-0"><i class="bi bi-body-text me-2"></i>Full Extracted Text</h5>
+            </div>
+            <div class="card-body">
+                <div class="extracted-text border p-3 bg-light rounded">
+                    <pre>{{ document.extracted_text }}</pre>
+                </div>
+            </div>
         </div>
         {% endif %}
     </div>
     
-    {% if total_pages > 1 %}
-    <div class="card-footer text-center">
-        <div class="btn-group">
-            <a href="{{ url_for('view_document', id=document.id, page=1) }}" class="btn btn-outline-primary" {% if current_page == 1 %}disabled{% endif %}>First</a>
-            <a href="{{ url_for('view_document', id=document.id, page=current_page-1) }}" class="btn btn-outline-primary" {% if current_page == 1 %}disabled{% endif %}>Previous</a>
-            <a href="{{ url_for('view_document', id=document.id, page=current_page+1) }}" class="btn btn-outline-primary" {% if current_page == total_pages %}disabled{% endif %}>Next</a>
-            <a href="{{ url_for('view_document', id=document.id, page=total_pages) }}" class="btn btn-outline-primary" {% if current_page == total_pages %}disabled{% endif %}>Last</a>
-        </div>
-    </div>
-    {% endif %}
-</div>
-{% endif %}
-
-{% if similar_documents %}
-<div class="card mb-4">
-    <div class="card-header bg-light">
-        <h5 class="mb-0">Similar Documents</h5>
-    </div>
-    <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-striped mb-0">
-                <thead>
-                    <tr>
-                        <th>Document</th>
-                        <th>Similarity</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
+    <div class="col-lg-4">
+        {% if similar_documents %}
+        <div class="card mb-4 section-card">
+            <div class="card-header bg-light">
+                <h5 class="mb-0"><i class="bi bi-diagram-3 me-2"></i>Similar Documents</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush">
                     {% for doc, score in similar_documents %}
-                    <tr>
-                        <td>
-                            <a href="{{ url_for('view_document', id=doc.id) }}">{{ doc.original_filename }}</a>
-                            <small class="text-muted d-block">{{ doc.file_type.upper() }} | {{ doc.paragraph_count }} paragraphs</small>
-                        </td>
-                        <td>{{ (score * 100)|round(1) }}%</td>
-                        <td>
-                            <a href="{{ url_for('compare_documents', doc1=document.id, doc2=doc.id) }}" class="btn btn-sm btn-outline-primary">Compare</a>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
-{% endif %}
-
-{% if document.status == 'processed' and document.paragraphs %}
-<div class="card mb-4">
-    <div class="card-header bg-light d-flex justify-content-between align-items-center">
-        <h5 class="mb-0">Paragraphs</h5>
-        <span class="badge bg-primary">{{ document.paragraphs|length }} paragraphs extracted</span>
-    </div>
-    <div class="card-body p-0">
-        <div class="accordion" id="paragraphAccordion">
-            {% for paragraph in document.paragraphs %}
-            <div class="accordion-item">
-                <h2 class="accordion-header" id="heading{{ paragraph.id }}">
-                    <button class="accordion-button {% if not loop.first %}collapsed{% endif %}" type="button" 
-                            data-bs-toggle="collapse" data-bs-target="#collapse{{ paragraph.id }}" 
-                            aria-expanded="{% if loop.first %}true{% else %}false{% endif %}" 
-                            aria-controls="collapse{{ paragraph.id }}">
-                        <div class="d-flex justify-content-between align-items-center w-100 me-3">
+                    <div class="list-group-item similar-doc">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
                             <div>
-                                <strong>Paragraph #{{ loop.index }}</strong>
-                                <small class="text-muted ms-2">{{ paragraph.content[:50] }}{% if paragraph.content|length > 50 %}...{% endif %}</small>
-                            </div>
-                            {% if paragraph.documents|length > 1 %}
-                            <span class="badge bg-info ms-2">
-                                Appears in {{ paragraph.documents|length }} document(s)
-                            </span>
-                            {% else %}
-                            <span class="badge bg-secondary ms-2">Unique</span>
-                            {% endif %}
-                        </div>
-                    </button>
-                </h2>
-                <div id="collapse{{ paragraph.id }}" class="accordion-collapse collapse {% if loop.first %}show{% endif %}" 
-                    aria-labelledby="heading{{ paragraph.id }}" data-bs-parent="#paragraphAccordion">
-                    <div class="accordion-body">
-                        <div class="border-start border-4 border-primary ps-3 py-1">
-                            {{ paragraph.content }}
-                        </div>
-                        
-                        <div class="mt-2">
-                            <small>
-                                <strong>Tags:</strong>
-                                {% for tag in paragraph.get_tags() %}
-                                <span class="badge" style="background-color: {{ tag.color }}">{{ tag.name }}</span>
-                                {% else %}
-                                <span class="text-muted">No tags</span>
-                                {% endfor %}
-                                <button type="button" class="btn btn-sm btn-outline-secondary ms-1" 
-                                        data-bs-toggle="modal" data-bs-target="#tagParagraphModal" 
-                                        data-paragraph-id="{{ paragraph.id }}">
-                                    <i class="bi bi-tag"></i>
-                                </button>
-                            </small>
-                        </div>
-                        
-                        {% if paragraph.documents|length > 1 %}
-                        <div class="mt-3">
-                            <h6>Also appears in:</h6>
-                            <div>
-                                {% for doc in paragraph.documents %}
-                                    {% if doc.id != document.id %}
-                                    <a href="{{ url_for('view_document', id=doc.id) }}" class="badge bg-primary text-decoration-none me-1 mb-1">
-                                        {{ doc.original_filename }}
-                                    </a>
+                                <h6 class="mb-1">
+                                    {% if doc.file_type == 'pdf' %}
+                                    <i class="bi bi-file-earmark-pdf text-danger me-1"></i>
+                                    {% elif doc.file_type == 'docx' %}
+                                    <i class="bi bi-file-earmark-word text-primary me-1"></i>
+                                    {% else %}
+                                    <i class="bi bi-file-earmark-text me-1"></i>
                                     {% endif %}
-                                {% endfor %}
+                                    <a href="{{ url_for('view_document', id=doc.id) }}">{{ doc.original_filename }}</a>
+                                </h6>
+                                <div class="small text-muted">
+                                    {{ doc.file_type.upper() }} | {{ doc.paragraph_count }} paragraphs
+                                </div>
                             </div>
+                            <span class="badge bg-primary rounded-pill">{{ (score * 100)|round(1) }}%</span>
                         </div>
-                        {% endif %}
+                        <div class="progress" style="height: 5px;">
+                            <div class="progress-bar" role="progressbar" style="width: {{ (score * 100)|round(1) }}%"></div>
+                        </div>
+                        <div class="mt-2">
+                            <a href="{{ url_for('compare_documents', doc1=document.id, doc2=doc.id) }}" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-arrows-angle-expand me-1"></i> Compare
+                            </a>
+                        </div>
                     </div>
+                    {% endfor %}
                 </div>
             </div>
-            {% endfor %}
         </div>
+        {% endif %}
+        
+        {% if document.status == 'processed' and document.paragraphs %}
+        <div class="card section-card">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-text-paragraph me-2"></i>Paragraphs</h5>
+                <span class="badge bg-primary">{{ document.paragraphs|length }}</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="accordion" id="paragraphAccordion">
+                    {% for paragraph in document.paragraphs %}
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="heading{{ paragraph.id }}">
+                            <button class="accordion-button {% if not loop.first %}collapsed{% endif %}" type="button" 
+                                    data-bs-toggle="collapse" data-bs-target="#collapse{{ paragraph.id }}" 
+                                    aria-expanded="{% if loop.first %}true{% else %}false{% endif %}" 
+                                    aria-controls="collapse{{ paragraph.id }}">
+                                <div class="d-flex justify-content-between align-items-center w-100 me-3">
+                                    <div class="text-truncate">
+                                        <span class="badge bg-secondary me-1">#{{ loop.index }}</span>
+                                        {{ paragraph.content[:50] }}{% if paragraph.content|length > 50 %}...{% endif %}
+                                    </div>
+                                    {% if paragraph.documents|length > 1 %}
+                                    <span class="badge bg-info ms-2">
+                                        {{ paragraph.documents|length }}x
+                                    </span>
+                                    {% endif %}
+                                </div>
+                            </button>
+                        </h2>
+                        <div id="collapse{{ paragraph.id }}" class="accordion-collapse collapse {% if loop.first %}show{% endif %}" 
+                            aria-labelledby="heading{{ paragraph.id }}" data-bs-parent="#paragraphAccordion">
+                            <div class="accordion-body">
+                                <div class="paragraph-content">
+                                    {{ paragraph.content }}
+                                </div>
+                                
+                                <div class="d-flex justify-content-between align-items-center mt-2">
+                                    <div>
+                                        <strong>Tags:</strong>
+                                        {% for tag in paragraph.get_tags() %}
+                                        <span class="badge" style="background-color: {{ tag.color }}">{{ tag.name }}</span>
+                                        {% else %}
+                                        <span class="text-muted">No tags</span>
+                                        {% endfor %}
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" 
+                                            data-bs-toggle="modal" data-bs-target="#tagParagraphModal" 
+                                            data-paragraph-id="{{ paragraph.id }}">
+                                        <i class="bi bi-tag"></i> Manage Tags
+                                    </button>
+                                </div>
+                                
+                                {% if paragraph.documents|length > 1 %}
+                                <div class="mt-3">
+                                    <h6><i class="bi bi-link-45deg me-1"></i>Also appears in:</h6>
+                                    <div>
+                                        {% for doc in paragraph.documents %}
+                                            {% if doc.id != document.id %}
+                                            <a href="{{ url_for('view_document', id=doc.id) }}" class="badge bg-primary text-decoration-none me-1 mb-1">
+                                                {{ doc.original_filename }}
+                                            </a>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
     </div>
 </div>
-{% endif %}
-
-{% if document.status == 'processed' %}
-<div class="card">
-    <div class="card-header bg-light">
-        <h5 class="mb-0">Full Extracted Text</h5>
-    </div>
-    <div class="card-body">
-        <div class="extracted-text border p-3 bg-light rounded">
-            <pre>{{ document.extracted_text }}</pre>
-        </div>
-    </div>
-</div>
-{% endif %}
 
 <!-- Delete Confirmation Modal -->
 <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="deleteModalLabel">Confirm Deletion</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteModalLabel">
+                    <i class="bi bi-exclamation-triangle me-2"></i>Confirm Deletion
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
+                <div class="text-center mb-3">
+                    <i class="bi bi-trash text-danger" style="font-size: 3rem;"></i>
+                </div>
                 <p>Are you sure you want to delete <strong>{{ document.original_filename }}</strong>?</p>
                 <p class="text-danger">This action cannot be undone.</p>
                 <p>Paragraphs that only appear in this document will also be deleted.</p>
@@ -280,9 +422,13 @@
                 {% endif %}
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x me-1"></i> Cancel
+                </button>
                 <form method="POST" action="{{ url_for('delete_document', id=document.id) }}">
-                    <button type="submit" class="btn btn-danger">Delete Document</button>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash me-1"></i> Delete Document
+                    </button>
                 </form>
             </div>
         </div>
@@ -295,7 +441,9 @@
         <div class="modal-content">
             <form method="POST" action="{{ url_for('tag_document', id=document.id) }}">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="tagDocumentModalLabel">Manage Document Tags</h5>
+                    <h5 class="modal-title" id="tagDocumentModalLabel">
+                        <i class="bi bi-tags me-2"></i>Manage Document Tags
+                    </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
@@ -340,7 +488,9 @@
             <form id="tagParagraphForm" method="POST" action="">
                 <input type="hidden" name="document_id" value="{{ document.id }}">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="tagParagraphModalLabel">Tag Paragraph</h5>
+                    <h5 class="modal-title" id="tagParagraphModalLabel">
+                        <i class="bi bi-tags me-2"></i>Tag Paragraph
+                    </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
@@ -348,6 +498,11 @@
                         <label class="form-label">Select Tags</label>
                         <div id="paragraphTagSelection" class="tag-selection">
                             <!-- Will be populated dynamically -->
+                            <div class="text-center py-4">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
                         </div>
                         <div class="mt-3">
                             <a href="{{ url_for('manage_tags') }}" target="_blank" class="btn btn-sm btn-outline-secondary">
@@ -365,6 +520,27 @@
     </div>
 </div>
 
+<!-- Fullscreen Preview Modal -->
+<div class="modal fade" id="fullscreenPreviewModal" tabindex="-1" aria-labelledby="fullscreenPreviewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-fullscreen">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="fullscreenPreviewModalLabel">
+                    <i class="bi bi-arrows-fullscreen me-2"></i>{{ document.original_filename }}
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <img id="fullscreenPreviewImage" src="" alt="Document Preview" class="img-fluid">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         // Setup paragraph tagging modal
@@ -400,9 +576,209 @@
                             `;
                             container.appendChild(div);
                         });
+                    })
+                    .catch(error => {
+                        console.error('Error fetching tags:', error);
+                        document.getElementById('paragraphTagSelection').innerHTML = 
+                            '<div class="alert alert-danger">Error loading tags</div>';
                     });
             });
         }
+        
+        // Enable fullscreen preview
+        const previewImage = document.querySelector('.document-preview');
+        const fullscreenModal = document.getElementById('fullscreenPreviewModal');
+        const fullscreenImage = document.getElementById('fullscreenPreviewImage');
+        
+        if (previewImage && fullscreenModal && fullscreenImage) {
+            previewImage.style.cursor = 'zoom-in';
+            
+            previewImage.addEventListener('click', function() {
+                fullscreenImage.src = this.src;
+                const modal = new bootstrap.Modal(fullscreenModal);
+                modal.show();
+            });
+        }
+        
+        // Enable copy to clipboard for extracted text
+        const extractedText = document.querySelector('.extracted-text pre');
+        if (extractedText) {
+            // Create a copy button
+            const copyBtn = document.createElement('button');
+            copyBtn.className = 'btn btn-sm btn-outline-secondary position-absolute top-0 end-0 m-2';
+            copyBtn.innerHTML = '<i class="bi bi-clipboard"></i>';
+            copyBtn.title = 'Copy to clipboard';
+            
+            // Add the button to the extracted text container
+            const textContainer = document.querySelector('.extracted-text');
+            textContainer.style.position = 'relative';
+            textContainer.appendChild(copyBtn);
+            
+            // Add click event
+            copyBtn.addEventListener('click', function() {
+                // Copy text to clipboard
+                navigator.clipboard.writeText(extractedText.textContent)
+                    .then(() => {
+                        // Success feedback
+                        copyBtn.innerHTML = '<i class="bi bi-check"></i>';
+                        copyBtn.classList.remove('btn-outline-secondary');
+                        copyBtn.classList.add('btn-success');
+                        
+                        // Reset after 2 seconds
+                        setTimeout(() => {
+                            copyBtn.innerHTML = '<i class="bi bi-clipboard"></i>';
+                            copyBtn.classList.remove('btn-success');
+                            copyBtn.classList.add('btn-outline-secondary');
+                        }, 2000);
+                    })
+                    .catch(err => {
+                        console.error('Could not copy text: ', err);
+                    });
+            });
+        }
+        
+        // Add search function for extracted text
+        const extractedTextContainer = document.querySelector('.extracted-text');
+        if (extractedTextContainer) {
+            // Create search input
+            const searchDiv = document.createElement('div');
+            searchDiv.className = 'input-group input-group-sm mb-2';
+            searchDiv.innerHTML = `
+                <span class="input-group-text bg-white">
+                    <i class="bi bi-search"></i>
+                </span>
+                <input type="text" class="form-control border-start-0" placeholder="Search in text..." id="textSearchInput">
+                <button class="btn btn-outline-secondary" type="button" id="prevMatchBtn" disabled>
+                    <i class="bi bi-arrow-up"></i>
+                </button>
+                <button class="btn btn-outline-secondary" type="button" id="nextMatchBtn" disabled>
+                    <i class="bi bi-arrow-down"></i>
+                </button>
+                <span class="input-group-text bg-light" id="matchCounter">0/0</span>
+            `;
+            
+            // Insert search input before extracted text
+            extractedTextContainer.parentNode.insertBefore(searchDiv, extractedTextContainer);
+            
+            // Get search elements
+            const searchInput = document.getElementById('textSearchInput');
+            const prevBtn = document.getElementById('prevMatchBtn');
+            const nextBtn = document.getElementById('nextMatchBtn');
+            const counter = document.getElementById('matchCounter');
+            
+            // Search variables
+            let matches = [];
+            let currentMatchIndex = -1;
+            
+            // Search function
+            function searchText() {
+                const searchTerm = searchInput.value.trim();
+                
+                // Reset
+                matches = [];
+                currentMatchIndex = -1;
+                
+                // Remove existing highlights
+                const content = extractedText.innerHTML;
+                extractedText.innerHTML = content.replace(/<mark class="highlight-match.*?>(.*?)<\/mark>/g, '$1');
+                
+                if (!searchTerm) {
+                    counter.textContent = '0/0';
+                    prevBtn.disabled = true;
+                    nextBtn.disabled = true;
+                    return;
+                }
+                
+                // Get text content
+                const text = extractedText.textContent;
+                
+                // Find all matches
+                let match;
+                const regex = new RegExp(searchTerm, 'gi');
+                while ((match = regex.exec(text)) !== null) {
+                    matches.push(match.index);
+                }
+                
+                // Update counter
+                counter.textContent = matches.length > 0 ? 
+                    `1/${matches.length}` : '0/0';
+                
+                // Update buttons
+                prevBtn.disabled = matches.length <= 0;
+                nextBtn.disabled = matches.length <= 0;
+                
+                // Highlight matches
+                if (matches.length > 0) {
+                    highlightMatch(0);
+                }
+            }
+            
+            // Highlight match and scroll to it
+            function highlightMatch(index) {
+                if (index < 0 || index >= matches.length) return;
+                
+                // Get match position
+                const matchPos = matches[index];
+                const searchTerm = searchInput.value.trim();
+                
+                // Get text content
+                const text = extractedText.textContent;
+                
+                // Create highlighted content
+                const before = text.substring(0, matchPos);
+                const match = text.substring(matchPos, matchPos + searchTerm.length);
+                const after = text.substring(matchPos + searchTerm.length);
+                
+                // Update content with highlighted match
+                extractedText.innerHTML = `${escapeHtml(before)}<mark class="highlight-match current-match">${escapeHtml(match)}</mark>${escapeHtml(after)}`;
+                
+                // Scroll to match
+                const highlightEl = extractedText.querySelector('.current-match');
+                if (highlightEl) {
+                    highlightEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+                
+                // Update current index
+                currentMatchIndex = index;
+                
+                // Update counter
+                counter.textContent = `${currentMatchIndex + 1}/${matches.length}`;
+            }
+            
+            // Escape HTML special characters
+            function escapeHtml(text) {
+                return text
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#039;");
+            }
+            
+            // Search input event
+            searchInput.addEventListener('input', searchText);
+            
+            // Previous/next buttons
+            prevBtn.addEventListener('click', function() {
+                if (matches.length > 0) {
+                    const newIndex = currentMatchIndex <= 0 ? matches.length - 1 : currentMatchIndex - 1;
+                    highlightMatch(newIndex);
+                }
+            });
+            
+            nextBtn.addEventListener('click', function() {
+                if (matches.length > 0) {
+                    const newIndex = currentMatchIndex >= matches.length - 1 ? 0 : currentMatchIndex + 1;
+                    highlightMatch(newIndex);
+                }
+            });
+        }
+        
+        // Prefetch tags for better user experience
+        fetch('/api/paragraph/1/tags')
+            .then(response => response.json())
+            .catch(error => console.log('Preloading tags data'));
     });
 </script>
+{% endblock %}
 {% endblock %}

@@ -2,20 +2,304 @@
 
 {% block title %}Log File: {{ filename }}{% endblock %}
 
+{% block extra_css %}
+<style>
+    .log-content pre {
+        font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+        font-size: 0.85rem;
+        line-height: 1.5;
+        padding: 1rem;
+        background-color: #f8f9fa;
+        border-radius: 0.25rem;
+        border: 1px solid #e9ecef;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        max-height: 600px;
+        overflow-y: auto;
+        position: relative;
+    }
+    
+    .log-date {
+        color: #6c757d;
+        font-weight: 500;
+    }
+    
+    .log-level-INFO {
+        color: #0d6efd;
+    }
+    
+    .log-level-WARNING {
+        color: #fd7e14;
+    }
+    
+    .log-level-ERROR {
+        color: #dc3545;
+    }
+    
+    .log-message {
+        color: #212529;
+    }
+    
+    .log-location {
+        color: #6c757d;
+        font-style: italic;
+    }
+    
+    .log-actions {
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        opacity: 0.5;
+        transition: opacity 0.2s ease;
+    }
+    
+    .log-content:hover .log-actions {
+        opacity: 1;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h1>Log File: {{ filename }}</h1>
-    <a href="{{ url_for('logs') }}" class="btn btn-secondary">Back to Logs</a>
+    <h2><i class="bi bi-file-earmark-text me-2"></i>Log File: {{ filename }}</h2>
+    <a href="{{ url_for('logs') }}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left me-1"></i> Back to Logs
+    </a>
 </div>
 
 <div class="card">
     <div class="card-header bg-light">
-        <h5 class="mb-0">Log Contents</h5>
+        <div class="d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="bi bi-list-ul me-2"></i>Log Contents</h5>
+            <div class="filters">
+                <div class="btn-group btn-group-sm" role="group">
+                    <button type="button" class="btn btn-outline-secondary filter-btn active" data-filter="all">
+                        All
+                    </button>
+                    <button type="button" class="btn btn-outline-primary filter-btn" data-filter="INFO">
+                        <i class="bi bi-info-circle me-1"></i> Info
+                    </button>
+                    <button type="button" class="btn btn-outline-warning filter-btn" data-filter="WARNING">
+                        <i class="bi bi-exclamation-triangle me-1"></i> Warning
+                    </button>
+                    <button type="button" class="btn btn-outline-danger filter-btn" data-filter="ERROR">
+                        <i class="bi bi-exclamation-circle me-1"></i> Error
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
     <div class="card-body">
-        <div class="log-content border p-3 bg-light rounded">
-            <pre style="max-height: 600px; overflow-y: auto;">{% for line in log_contents %}{{ line }}{% endfor %}</pre>
+        <div class="log-content position-relative">
+            <div class="log-actions">
+                <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-secondary btn-sm" id="copyLogBtn" title="Copy to clipboard">
+                        <i class="bi bi-clipboard"></i>
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm" id="downloadLogBtn" title="Download log file">
+                        <i class="bi bi-download"></i>
+                    </button>
+                </div>
+            </div>
+            <pre id="logContentPre">{% for line in log_contents %}{{ line }}{% endfor %}</pre>
+        </div>
+    </div>
+    <div class="card-footer bg-light">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <small class="text-muted" id="lineCount">Loading...</small>
+            </div>
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="autoScrollSwitch" checked>
+                <label class="form-check-label" for="autoScrollSwitch">Auto-scroll to bottom</label>
+            </div>
         </div>
     </div>
 </div>
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Format log lines
+        const logContentPre = document.getElementById('logContentPre');
+        if (logContentPre) {
+            const content = logContentPre.innerHTML;
+            
+            // Parse and format log lines
+            const formattedLines = content.split('\n').map(line => {
+                // Skip empty lines
+                if (!line.trim()) return line;
+                
+                // Try to parse log line format: "2023-01-01 12:34:56 INFO: message [in file.py:line]"
+                const dateMatch = line.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})/);
+                if (dateMatch) {
+                    const date = dateMatch[1];
+                    
+                    // Extract log level
+                    const levelMatch = line.match(/\d{2}:\d{2}:\d{2} (\w+):/);
+                    const level = levelMatch ? levelMatch[1] : '';
+                    
+                    // Extract message and location
+                    const messageMatch = line.match(/: (.*?)( \[in .*\])?$/);
+                    if (messageMatch) {
+                        const message = messageMatch[1];
+                        const location = messageMatch[2] || '';
+                        
+                        // Format with spans for styling
+                        return `<span class="log-date">${date}</span> <span class="log-level-${level}">${level}:</span> <span class="log-message">${message}</span><span class="log-location">${location}</span>`;
+                    }
+                }
+                
+                // Return original line if not matching expected format
+                return line;
+            });
+            
+            // Update log content
+            logContentPre.innerHTML = formattedLines.join('\n');
+            
+            // Update line count
+            const lineCount = content.split('\n').filter(line => line.trim()).length;
+            document.getElementById('lineCount').textContent = `${lineCount} log entries`;
+            
+            // Auto-scroll to bottom
+            if (document.getElementById('autoScrollSwitch').checked) {
+                logContentPre.scrollTop = logContentPre.scrollHeight;
+            }
+        }
+        
+        // Log filtering
+        const filterButtons = document.querySelectorAll('.filter-btn');
+        filterButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                // Update active button
+                filterButtons.forEach(btn => btn.classList.remove('active'));
+                this.classList.add('active');
+                
+                const filter = this.getAttribute('data-filter');
+                
+                // Filter log lines
+                if (logContentPre) {
+                    const logLines = logContentPre.querySelectorAll('span.log-date').forEach(dateSpan => {
+                        const logLine = dateSpan.parentNode;
+                        
+                        if (filter === 'all') {
+                            logLine.style.display = '';
+                        } else {
+                            const levelSpan = dateSpan.nextElementSibling;
+                            if (levelSpan && levelSpan.textContent.includes(filter)) {
+                                logLine.style.display = '';
+                            } else {
+                                logLine.style.display = 'none';
+                            }
+                        }
+                    });
+                }
+            });
+        });
+        
+        // Copy log to clipboard
+        const copyLogBtn = document.getElementById('copyLogBtn');
+        if (copyLogBtn && logContentPre) {
+            copyLogBtn.addEventListener('click', function() {
+                // Get text content without HTML formatting
+                const textContent = logContentPre.textContent;
+                
+                // Copy to clipboard
+                navigator.clipboard.writeText(textContent).then(() => {
+                    // Success feedback
+                    const originalTooltip = copyLogBtn.getAttribute('title');
+                    copyLogBtn.setAttribute('title', 'Copied!');
+                    copyLogBtn.classList.add('btn-success');
+                    copyLogBtn.classList.remove('btn-outline-secondary');
+                    
+                    // Reset after 2 seconds
+                    setTimeout(() => {
+                        copyLogBtn.setAttribute('title', originalTooltip);
+                        copyLogBtn.classList.remove('btn-success');
+                        copyLogBtn.classList.add('btn-outline-secondary');
+                    }, 2000);
+                });
+            });
+        }
+        
+        // Download log file
+        const downloadLogBtn = document.getElementById('downloadLogBtn');
+        if (downloadLogBtn && logContentPre) {
+            downloadLogBtn.addEventListener('click', function() {
+                // Get text content
+                const textContent = logContentPre.textContent;
+                
+                // Create blob
+                const blob = new Blob([textContent], { type: 'text/plain' });
+                
+                // Create download link
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = '{{ filename }}';
+                
+                // Trigger download
+                document.body.appendChild(a);
+                a.click();
+                
+                // Cleanup
+                document.body.removeChild(a);
+                URL.revokeObjectURL(a.href);
+            });
+        }
+        
+        // Auto-scroll toggle
+        const autoScrollSwitch = document.getElementById('autoScrollSwitch');
+        if (autoScrollSwitch && logContentPre) {
+            autoScrollSwitch.addEventListener('change', function() {
+                if (this.checked) {
+                    logContentPre.scrollTop = logContentPre.scrollHeight;
+                }
+            });
+        }
+        
+        // Search functionality
+        const searchInput = document.createElement('input');
+        searchInput.type = 'text';
+        searchInput.placeholder = 'Search logs...';
+        searchInput.className = 'form-control form-control-sm mt-2';
+        
+        // Add search input after filter buttons
+        const filtersDiv = document.querySelector('.filters');
+        if (filtersDiv) {
+            filtersDiv.appendChild(searchInput);
+            
+            searchInput.addEventListener('input', function() {
+                const searchTerm = this.value.toLowerCase();
+                
+                if (!searchTerm.trim()) {
+                    // If search is empty, reset highlighting
+                    const highlightedText = logContentPre.querySelectorAll('.highlight');
+                    highlightedText.forEach(el => {
+                        el.outerHTML = el.innerHTML;
+                    });
+                    return;
+                }
+                
+                // First remove all existing highlights
+                const highlightedText = logContentPre.querySelectorAll('.highlight');
+                highlightedText.forEach(el => {
+                    el.outerHTML = el.innerHTML;
+                });
+                
+                // Get the log content text
+                const logText = logContentPre.innerHTML;
+                
+                // Replace the search term with a highlighted version
+                // Use a regex with word boundaries for better matching
+                const regex = new RegExp(`(${searchTerm})`, 'gi');
+                const newText = logText.replace(regex, '<span class="highlight" style="background-color: yellow; color: black;">$1</span>');
+                
+                // Update the log content
+                logContentPre.innerHTML = newText;
+            });
+        }
+    });
+</script>
 {% endblock %}
+{% endblock %}
+                    

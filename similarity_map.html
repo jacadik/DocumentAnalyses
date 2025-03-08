@@ -2,93 +2,255 @@
 
 {% block title %}Document Similarity Map{% endblock %}
 
+{% block extra_css %}
+<style>
+    #similarity-network {
+        width: 100%;
+        height: 600px;
+        background-color: #ffffff;
+        border-radius: 0.5rem;
+        box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.05);
+    }
+    .node-tooltip {
+        position: absolute;
+        background-color: rgba(0, 0, 0, 0.8);
+        color: #fff;
+        padding: 8px 12px;
+        border-radius: 4px;
+        font-size: 12px;
+        pointer-events: none;
+        z-index: 1000;
+        display: none;
+    }
+    .network-controls {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        background-color: rgba(255, 255, 255, 0.9);
+        padding: 8px;
+        border-radius: 4px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        z-index: 100;
+    }
+    .control-group {
+        margin-bottom: 10px;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h1>Document Similarity Map</h1>
+    <h2><i class="bi bi-diagram-3 me-2"></i>Document Similarity Map</h2>
     <div>
-        <a href="{{ url_for('documents') }}" class="btn btn-secondary me-2">Back to Documents</a>
+        <a href="{{ url_for('documents') }}" class="btn btn-outline-primary me-2">
+            <i class="bi bi-files me-1"></i> View Documents
+        </a>
         <form method="POST" action="{{ url_for('calculate_similarities') }}" class="d-inline-block">
             <div class="input-group">
                 <input type="number" name="min_similarity" min="0.1" max="0.9" step="0.05" class="form-control" 
                        value="0.3" style="max-width: 100px;" title="Minimum similarity threshold (0.1-0.9)">
-                <button type="submit" class="btn btn-primary">Recalculate Similarities</button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-arrow-repeat me-1"></i> Recalculate
+                </button>
             </div>
         </form>
     </div>
 </div>
 
 {% if not similarity_count %}
-<div class="alert alert-info">
-    <p>No document similarities calculated yet. Click "Recalculate Similarities" to analyze document relationships.</p>
-    {% if documents|length < 2 %}
-    <p>Note: You need at least 2 processed documents to calculate similarities.</p>
-    {% endif %}
+<div class="alert alert-info d-flex">
+    <div class="me-3">
+        <i class="bi bi-info-circle-fill fs-1"></i>
+    </div>
+    <div>
+        <h5>No Document Similarities Calculated Yet</h5>
+        <p>Calculate document similarities to visualize the relationships between your documents. The system will analyze text content to find connections.</p>
+        {% if documents|length < 2 %}
+        <div class="alert alert-warning mt-2 mb-0">
+            <strong>Note:</strong> You need at least 2 processed documents to calculate similarities.
+        </div>
+        {% else %}
+        <button type="submit" class="btn btn-primary" form="calculate-form">
+            <i class="bi bi-arrow-repeat me-1"></i> Calculate Similarities Now
+        </button>
+        <form id="calculate-form" method="POST" action="{{ url_for('calculate_similarities') }}">
+            <input type="hidden" name="min_similarity" value="0.3">
+        </form>
+        {% endif %}
+    </div>
+</div>
+
+{% if documents|length < 2 %}
+<div class="text-center py-5">
+    <div class="mb-4">
+        <i class="bi bi-diagram-3 display-1 text-muted"></i>
+    </div>
+    <h3>Need More Documents</h3>
+    <p class="text-muted mb-4">You need at least 2 processed documents to calculate and visualize similarities.</p>
+    <a href="{{ url_for('upload') }}" class="btn btn-primary btn-lg">
+        <i class="bi bi-upload me-1"></i> Upload Documents
+    </a>
 </div>
 {% endif %}
 
-{% if similarity_count > 0 %}
-<div class="card mb-4">
-    <div class="card-header bg-light">
-        <h5 class="mb-0">Document Similarity Network</h5>
-    </div>
-    <div class="card-body p-0">
-        <div id="similarity-network" style="width: 100%; height: 600px; border: 1px solid #eee; background-color: #fafafa;"></div>
-    </div>
-    <div class="card-footer">
-        <div class="d-flex justify-content-between align-items-center">
-            <div>
-                <span class="badge bg-danger me-2">PDF</span>
-                <span class="badge bg-primary me-2">DOCX</span>
-                <small class="text-muted">Node size indicates number of paragraphs</small>
+{% else %}
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card mb-4">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-diagram-3 me-2"></i>Document Similarity Network</h5>
+                <div>
+                    <button class="btn btn-sm btn-outline-secondary" id="resetZoomBtn">
+                        <i class="bi bi-arrows-fullscreen me-1"></i> Reset View
+                    </button>
+                </div>
             </div>
-            <div>
-                <button class="btn btn-sm btn-outline-secondary" id="resetZoomBtn">Reset View</button>
+            <div class="card-body p-0 position-relative">
+                <div class="network-controls">
+                    <div class="control-group">
+                        <label class="form-label mb-1">Link Strength</label>
+                        <input type="range" class="form-range" min="0" max="1" step="0.1" id="linkStrength" value="0.5">
+                    </div>
+                    <div class="control-group">
+                        <label class="form-label mb-1">Node Charge</label>
+                        <input type="range" class="form-range" min="-1000" max="-100" step="50" id="nodeCharge" value="-300">
+                    </div>
+                </div>
+                <div id="similarity-network"></div>
+                <div class="node-tooltip" id="nodeTooltip"></div>
             </div>
+            <div class="card-footer">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="badge bg-danger me-2">PDF</span>
+                        <span class="badge bg-primary me-2">DOCX</span>
+                        <small class="text-muted">Node size indicates number of paragraphs</small>
+                    </div>
+                    <div>
+                        <small class="text-muted">
+                            <i class="bi bi-info-circle me-1"></i> Drag nodes to reposition • Scroll to zoom
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header bg-light">
+                <h5 class="mb-0"><i class="bi bi-link-45deg me-2"></i>Strongest Connections</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush">
+                    {% for sim in similarities[:10] %}
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="badge bg-primary rounded-pill">{{ (sim.similarity_score * 100)|round(1) }}% Similar</span>
+                            <a href="{{ url_for('compare_documents', doc1=sim.source_id, doc2=sim.target_id) }}" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-arrows-angle-expand me-1"></i> Compare
+                            </a>
+                        </div>
+                        <div class="row align-items-center">
+                            <div class="col-5">
+                                {% if sim.source.file_type == 'pdf' %}
+                                <i class="bi bi-file-earmark-pdf text-danger me-1"></i>
+                                {% elif sim.source.file_type == 'docx' %}
+                                <i class="bi bi-file-earmark-word text-primary me-1"></i>
+                                {% endif %}
+                                <a href="{{ url_for('view_document', id=sim.source_id) }}" class="text-truncate d-inline-block" style="max-width: 150px;" title="{{ sim.source.original_filename }}">
+                                    {{ sim.source.original_filename }}
+                                </a>
+                            </div>
+                            <div class="col-2 text-center">
+                                <i class="bi bi-link-45deg text-muted"></i>
+                            </div>
+                            <div class="col-5 text-end">
+                                {% if sim.target.file_type == 'pdf' %}
+                                <i class="bi bi-file-earmark-pdf text-danger me-1"></i>
+                                {% elif sim.target.file_type == 'docx' %}
+                                <i class="bi bi-file-earmark-word text-primary me-1"></i>
+                                {% endif %}
+                                <a href="{{ url_for('view_document', id=sim.target_id) }}" class="text-truncate d-inline-block" style="max-width: 150px;" title="{{ sim.target.original_filename }}">
+                                    {{ sim.target.original_filename }}
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% if similarities|length > 10 %}
+            <div class="card-footer text-center">
+                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#allSimilaritiesTable">
+                    <i class="bi bi-eye me-1"></i> View All {{ similarities|length }} Connections
+                </button>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>
 
-<div class="card">
-    <div class="card-header bg-light">
-        <h5 class="mb-0">Strongest Document Similarities</h5>
-    </div>
-    <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-striped table-hover mb-0">
-                <thead class="table-light">
-                    <tr>
-                        <th>Document 1</th>
-                        <th>Document 2</th>
-                        <th>Similarity Score</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for sim in similarities %}
-                    <tr>
-                        <td>
-                            <a href="{{ url_for('view_document', id=sim.source_id) }}">
-                                {{ sim.source.original_filename }}
-                            </a>
-                        </td>
-                        <td>
-                            <a href="{{ url_for('view_document', id=sim.target_id) }}">
-                                {{ sim.target.original_filename }}
-                            </a>
-                        </td>
-                        <td>{{ (sim.similarity_score * 100)|round(1) }}%</td>
-                        <td>
-                            <a href="{{ url_for('compare_documents', doc1=sim.source_id, doc2=sim.target_id) }}" class="btn btn-sm btn-outline-primary">
-                                Compare
-                            </a>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+{% if similarities|length > 10 %}
+<div class="collapse mt-4" id="allSimilaritiesTable">
+    <div class="card">
+        <div class="card-header bg-light">
+            <h5 class="mb-0"><i class="bi bi-table me-2"></i>All Document Similarities</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Document 1</th>
+                            <th>Document 2</th>
+                            <th class="text-center">Similarity</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sim in similarities %}
+                        <tr>
+                            <td>
+                                <a href="{{ url_for('view_document', id=sim.source_id) }}" class="text-truncate d-inline-block" style="max-width: 200px;">
+                                    {% if sim.source.file_type == 'pdf' %}
+                                    <i class="bi bi-file-earmark-pdf text-danger me-1"></i>
+                                    {% elif sim.source.file_type == 'docx' %}
+                                    <i class="bi bi-file-earmark-word text-primary me-1"></i>
+                                    {% endif %}
+                                    {{ sim.source.original_filename }}
+                                </a>
+                            </td>
+                            <td>
+                                <a href="{{ url_for('view_document', id=sim.target_id) }}" class="text-truncate d-inline-block" style="max-width: 200px;">
+                                    {% if sim.target.file_type == 'pdf' %}
+                                    <i class="bi bi-file-earmark-pdf text-danger me-1"></i>
+                                    {% elif sim.target.file_type == 'docx' %}
+                                    <i class="bi bi-file-earmark-word text-primary me-1"></i>
+                                    {% endif %}
+                                    {{ sim.target.original_filename }}
+                                </a>
+                            </td>
+                            <td class="text-center">
+                                <div class="progress" style="height: 8px;">
+                                    <div class="progress-bar bg-primary" style="width: {{ sim.similarity_score * 100 }}%"></div>
+                                </div>
+                                <small class="text-muted">{{ (sim.similarity_score * 100)|round(1) }}%</small>
+                            </td>
+                            <td class="text-end">
+                                <a href="{{ url_for('compare_documents', doc1=sim.source_id, doc2=sim.target_id) }}" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-arrows-angle-expand me-1"></i> Compare
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 </div>
+{% endif %}
 
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script>
@@ -114,6 +276,8 @@
     function createSimilarityNetwork(container, data) {
         const width = document.querySelector(container).clientWidth;
         const height = 600;
+        const tooltip = document.getElementById('nodeTooltip');
+        let currentTransform = d3.zoomIdentity;
         
         // Clear any existing visualization
         d3.select(container).html("");
@@ -121,30 +285,66 @@
         const svg = d3.select(container)
             .append("svg")
             .attr("width", width)
-            .attr("height", height)
-            .call(d3.zoom().on("zoom", function(event) {
-                g.attr("transform", event.transform);
-            }));
+            .attr("height", height);
             
+        // Add zoom behavior
+        const zoom = d3.zoom()
+            .scaleExtent([0.1, 4])
+            .on("zoom", function(event) {
+                currentTransform = event.transform;
+                g.attr("transform", currentTransform);
+                
+                // Hide tooltip when zooming
+                tooltip.style.display = 'none';
+            });
+            
+        svg.call(zoom);
+        
         const g = svg.append("g");
         
-        // Set up force simulation
+        // Define link gradient for better visibility
+        const defs = svg.append("defs");
+        
+        data.links.forEach((link, i) => {
+            const gradientId = `link-gradient-${i}`;
+            const gradient = defs.append("linearGradient")
+                .attr("id", gradientId)
+                .attr("gradientUnits", "userSpaceOnUse");
+                
+            gradient.append("stop")
+                .attr("offset", "0%")
+                .attr("stop-color", getNodeById(link.source).color);
+                
+            gradient.append("stop")
+                .attr("offset", "100%")
+                .attr("stop-color", getNodeById(link.target).color);
+        });
+        
+        function getNodeById(id) {
+            return data.nodes.find(node => node.id === id) || { color: "#777" };
+        }
+        
+        // Set up force simulation with configurable parameters
+        let linkStrength = 0.5;
+        let nodeCharge = -300;
+        
         const simulation = d3.forceSimulation(data.nodes)
-            .force("link", d3.forceLink(data.links).id(d => d.id).distance(d => 200 * (1 - d.similarity)))
-            .force("charge", d3.forceManyBody().strength(-300))
+            .force("link", d3.forceLink(data.links).id(d => d.id).distance(d => 200 * (1 - d.similarity)).strength(linkStrength))
+            .force("charge", d3.forceManyBody().strength(nodeCharge))
             .force("center", d3.forceCenter(width / 2, height / 2))
             .force("x", d3.forceX(width / 2).strength(0.1))
             .force("y", d3.forceY(height / 2).strength(0.1));
         
-        // Create links
+        // Create links with gradients
         const link = g.append("g")
             .attr("class", "links")
             .selectAll("line")
             .data(data.links)
             .enter().append("line")
-            .attr("stroke", "#999")
-            .attr("stroke-opacity", 0.6)
-            .attr("stroke-width", d => Math.max(1, d.value));
+            .attr("stroke", (d, i) => `url(#link-gradient-${i})`)
+            .attr("stroke-opacity", 0.7)
+            .attr("stroke-width", d => Math.max(1, d.value))
+            .attr("stroke-linecap", "round");
         
         // Create nodes
         const node = g.append("g")
@@ -155,7 +355,10 @@
             .call(d3.drag()
                 .on("start", dragstarted)
                 .on("drag", dragged)
-                .on("end", dragended));
+                .on("end", dragended))
+            .on("mouseover", showTooltip)
+            .on("mouseout", hideTooltip)
+            .on("click", nodeClicked);
         
         // Add circles to nodes
         node.append("circle")
@@ -170,11 +373,13 @@
             .attr('x', d => d.size + 2)
             .attr('y', 4)
             .attr('font-size', '10px')
-            .attr('font-family', 'Arial, sans-serif');
-        
-        // Add title for hover tooltip
-        node.append("title")
-            .text(d => `${d.name}\n${d.paragraphs} paragraphs`);
+            .attr('font-family', 'Inter, sans-serif')
+            .attr('paint-order', 'stroke')
+            .attr('stroke', '#fff')
+            .attr('stroke-width', '3px')
+            .attr('stroke-linecap', 'round')
+            .attr('stroke-linejoin', 'round')
+            .attr('fill', '#333');
         
         // Update positions on each tick
         simulation.on("tick", () => {
@@ -191,17 +396,56 @@
         // Reset zoom button
         document.getElementById('resetZoomBtn').addEventListener('click', function() {
             svg.transition().duration(750).call(
-                d3.zoom().transform,
+                zoom.transform,
                 d3.zoomIdentity,
                 d3.zoomTransform(svg.node()).invert([width / 2, height / 2])
             );
         });
+        
+        // Link strength control
+        document.getElementById('linkStrength').addEventListener('input', function() {
+            linkStrength = this.value;
+            simulation.force("link").strength(linkStrength);
+            simulation.alpha(0.3).restart();
+        });
+        
+        // Node charge control
+        document.getElementById('nodeCharge').addEventListener('input', function() {
+            nodeCharge = this.value;
+            simulation.force("charge").strength(nodeCharge);
+            simulation.alpha(0.3).restart();
+        });
+        
+        // Tooltip functions
+        function showTooltip(event, d) {
+            const [x, y] = d3.pointer(event, document.body);
+            
+            tooltip.innerHTML = `
+                <div><strong>${d.name}</strong></div>
+                <div>Paragraphs: ${d.paragraphs}</div>
+                <div>Type: ${d.file_type.toUpperCase()}</div>
+                <div class="text-muted small">Click to open document</div>
+            `;
+            
+            tooltip.style.display = 'block';
+            tooltip.style.left = `${x + 10}px`;
+            tooltip.style.top = `${y - 10}px`;
+        }
+        
+        function hideTooltip() {
+            tooltip.style.display = 'none';
+        }
+        
+        function nodeClicked(event, d) {
+            window.location.href = `/document/${d.id}`;
+        }
         
         // Drag functions
         function dragstarted(event, d) {
             if (!event.active) simulation.alphaTarget(0.3).restart();
             d.fx = d.x;
             d.fy = d.y;
+            hideTooltip();
         }
         
         function dragged(event, d) {

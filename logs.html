@@ -2,37 +2,290 @@
 
 {% block title %}Application Logs{% endblock %}
 
+{% block extra_css %}
+<style>
+    .log-content pre {
+        font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+        font-size: 0.85rem;
+        line-height: 1.5;
+        padding: 1rem;
+        background-color: #f8f9fa;
+        border-radius: 0.25rem;
+        border: 1px solid #e9ecef;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        max-height: 500px;
+        overflow-y: auto;
+        position: relative;
+    }
+    
+    .log-date {
+        color: #6c757d;
+        font-weight: 500;
+    }
+    
+    .log-level-INFO {
+        color: #0d6efd;
+    }
+    
+    .log-level-WARNING {
+        color: #fd7e14;
+    }
+    
+    .log-level-ERROR {
+        color: #dc3545;
+    }
+    
+    .log-message {
+        color: #212529;
+    }
+    
+    .log-location {
+        color: #6c757d;
+        font-style: italic;
+    }
+    
+    .log-list-item {
+        transition: all 0.2s ease;
+    }
+    
+    .log-list-item:hover {
+        transform: translateX(3px);
+    }
+    
+    .log-list-item.active {
+        background-color: rgba(13, 110, 253, 0.1);
+        border-color: #0d6efd;
+        color: #0d6efd;
+    }
+    
+    .log-actions {
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        opacity: 0.5;
+        transition: opacity 0.2s ease;
+    }
+    
+    .log-content:hover .log-actions {
+        opacity: 1;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<h1>Application Logs</h1>
-<p class="lead">View application logs to troubleshoot issues.</p>
-
-<div class="card mb-4">
-    <div class="card-header bg-light">
-        <h5 class="mb-0">Log Files</h5>
-    </div>
-    <div class="card-body">
-        {% if log_files %}
-        <div class="list-group">
-            {% for log_file in log_files %}
-            <a href="{{ url_for('view_log', filename=log_file) }}" class="list-group-item list-group-item-action">
-                {{ log_file }}
-            </a>
-            {% endfor %}
-        </div>
-        {% else %}
-        <div class="alert alert-info">No log files found.</div>
-        {% endif %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-journal-text me-2"></i>Application Logs</h2>
+    <div>
+        <a href="{{ url_for('documents') }}" class="btn btn-outline-primary">
+            <i class="bi bi-arrow-left me-1"></i> Back to Documents
+        </a>
     </div>
 </div>
 
-<div class="card">
-    <div class="card-header bg-light">
-        <h5 class="mb-0">Current Log</h5>
+<div class="row">
+    <div class="col-md-4 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-light">
+                <h5 class="mb-0"><i class="bi bi-list-ul me-2"></i>Log Files</h5>
+            </div>
+            <div class="card-body p-0">
+                {% if log_files %}
+                <div class="list-group list-group-flush">
+                    {% for log_file in log_files %}
+                    <a href="{{ url_for('view_log', filename=log_file) }}" 
+                       class="list-group-item list-group-item-action log-list-item d-flex justify-content-between align-items-center {% if filename is defined and filename == log_file %}active{% endif %}">
+                        <div>
+                            <i class="bi bi-file-text me-2"></i>
+                            {{ log_file }}
+                        </div>
+                        <span class="badge bg-primary rounded-pill">
+                            {{ log_file.split('_')[1].split('.')[0] }}
+                        </span>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="alert alert-info m-3">No log files found.</div>
+                {% endif %}
+            </div>
+        </div>
     </div>
-    <div class="card-body">
-        <div class="log-content border p-3 bg-light rounded">
-            <pre style="max-height: 500px; overflow-y: auto;">{% for line in log_contents %}{{ line }}{% endfor %}</pre>
+    
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-light">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        {% if filename is defined %}
+                        <i class="bi bi-file-earmark-text me-2"></i>{{ filename }}
+                        {% else %}
+                        <i class="bi bi-file-earmark-text me-2"></i>Current Log
+                        {% endif %}
+                    </h5>
+                    <div class="filters">
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button type="button" class="btn btn-outline-secondary filter-btn active" data-filter="all">
+                                All
+                            </button>
+                            <button type="button" class="btn btn-outline-primary filter-btn" data-filter="INFO">
+                                <i class="bi bi-info-circle me-1"></i> Info
+                            </button>
+                            <button type="button" class="btn btn-outline-warning filter-btn" data-filter="WARNING">
+                                <i class="bi bi-exclamation-triangle me-1"></i> Warning
+                            </button>
+                            <button type="button" class="btn btn-outline-danger filter-btn" data-filter="ERROR">
+                                <i class="bi bi-exclamation-circle me-1"></i> Error
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="log-content position-relative">
+                    <div class="log-actions">
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-secondary btn-sm" id="copyLogBtn" title="Copy to clipboard">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm" id="downloadLogBtn" title="Download log file">
+                                <i class="bi bi-download"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <pre id="logContentPre">{% for line in log_contents %}{{ line }}{% endfor %}</pre>
+                </div>
+            </div>
         </div>
     </div>
 </div>
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Format log lines
+        const logContentPre = document.getElementById('logContentPre');
+        if (logContentPre) {
+            const content = logContentPre.innerHTML;
+            
+            // Parse and format log lines
+            const formattedContent = content.split('\n').map(line => {
+                // Skip empty lines
+                if (!line.trim()) return line;
+                
+                // Try to parse log line format: "2023-01-01 12:34:56 INFO: message [in file.py:line]"
+                const dateMatch = line.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})/);
+                if (dateMatch) {
+                    const date = dateMatch[1];
+                    
+                    // Extract log level
+                    const levelMatch = line.match(/\d{2}:\d{2}:\d{2} (\w+):/);
+                    const level = levelMatch ? levelMatch[1] : '';
+                    
+                    // Extract message and location
+                    const messageMatch = line.match(/: (.*?)( \[in .*\])?$/);
+                    if (messageMatch) {
+                        const message = messageMatch[1];
+                        const location = messageMatch[2] || '';
+                        
+                        // Format with spans for styling
+                        return `<span class="log-date">${date}</span> <span class="log-level-${level}">${level}:</span> <span class="log-message">${message}</span><span class="log-location">${location}</span>`;
+                    }
+                }
+                
+                // Return original line if not matching expected format
+                return line;
+            }).join('\n');
+            
+            logContentPre.innerHTML = formattedContent;
+        }
+        
+        // Log filtering
+        const filterButtons = document.querySelectorAll('.filter-btn');
+        filterButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                // Update active button
+                filterButtons.forEach(btn => btn.classList.remove('active'));
+                this.classList.add('active');
+                
+                const filter = this.getAttribute('data-filter');
+                
+                // Filter log lines
+                if (logContentPre) {
+                    const logLines = logContentPre.querySelectorAll('span.log-date').forEach(dateSpan => {
+                        const logLine = dateSpan.parentNode;
+                        
+                        if (filter === 'all') {
+                            logLine.style.display = '';
+                        } else {
+                            const levelSpan = dateSpan.nextElementSibling;
+                            if (levelSpan && levelSpan.textContent.includes(filter)) {
+                                logLine.style.display = '';
+                            } else {
+                                logLine.style.display = 'none';
+                            }
+                        }
+                    });
+                }
+            });
+        });
+        
+        // Copy log to clipboard
+        const copyLogBtn = document.getElementById('copyLogBtn');
+        if (copyLogBtn && logContentPre) {
+            copyLogBtn.addEventListener('click', function() {
+                // Get text content without HTML formatting
+                const textContent = logContentPre.textContent;
+                
+                // Copy to clipboard
+                navigator.clipboard.writeText(textContent).then(() => {
+                    // Success feedback
+                    const originalTooltip = copyLogBtn.getAttribute('title');
+                    copyLogBtn.setAttribute('title', 'Copied!');
+                    copyLogBtn.classList.add('btn-success');
+                    copyLogBtn.classList.remove('btn-outline-secondary');
+                    
+                    // Reset after 2 seconds
+                    setTimeout(() => {
+                        copyLogBtn.setAttribute('title', originalTooltip);
+                        copyLogBtn.classList.remove('btn-success');
+                        copyLogBtn.classList.add('btn-outline-secondary');
+                    }, 2000);
+                });
+            });
+        }
+        
+        // Download log file
+        const downloadLogBtn = document.getElementById('downloadLogBtn');
+        if (downloadLogBtn && logContentPre) {
+            downloadLogBtn.addEventListener('click', function() {
+                // Get text content
+                const textContent = logContentPre.textContent;
+                
+                // Create blob
+                const blob = new Blob([textContent], { type: 'text/plain' });
+                
+                // Create download link
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                
+                // Set filename
+                {% if filename is defined %}
+                a.download = '{{ filename }}';
+                {% else %}
+                a.download = 'current_log.log';
+                {% endif %}
+                
+                // Trigger download
+                document.body.appendChild(a);
+                a.click();
+                
+                // Cleanup
+                document.body.removeChild(a);
+                URL.revokeObjectURL(a.href);
+            });
+        }
+    });
+</script>
+{% endblock %}
 {% endblock %}
