@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Page Not Found{% endblock %}
+
+{% block content %}
+<div class="text-center py-5">
+    <div class="error-icon mb-4">
+        <i class="bi bi-question-circle display-1 text-muted"></i>
+    </div>
+    
+    <h1>404 - Page Not Found</h1>
+    <p class="lead text-muted mb-4">The page you were looking for doesn't exist or has been moved.</p>
+    
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h2 class="h5 mb-3">Looking for something?</h2>
+                    <ul class="list-group list-group-flush mb-3">
+                        <li class="list-group-item">
+                            <a href="{{ url_for('documents.list') }}" class="text-decoration-none">
+                                <i class="bi bi-files me-2"></i> View Document Library
+                            </a>
+                        </li>
+                        <li class="list-group-item">
+                            <a href="{{ url_for('documents.upload') }}" class="text-decoration-none">
+                                <i class="bi bi-cloud-upload me-2"></i> Upload New Documents
+                            </a>
+                        </li>
+                        <li class="list-group-item">
+                            <a href="{{ url_for('paragraphs.list') }}" class="text-decoration-none">
+                                <i class="bi bi-text-paragraph me-2"></i> View Paragraph Analysis
+                            </a>
+                        </li>
+                        <li class="list-group-item">
+                            <a href="{{ url_for('similarity.map') }}" class="text-decoration-none">
+                                <i class="bi bi-diagram-3 me-2"></i> View Content Similarity Map
+                            </a>
+                        </li>
+                    </ul>
+                    
+                    <a href="{{ url_for('documents.index') }}" class="btn btn-primary w-100">
+                        <i class="bi bi-house-door me-1"></i> Go to Home Page
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

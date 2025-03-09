@@ -461,6 +461,7 @@ def process_paragraphs(text, document, db_session):
     This function maintains the exact signature expected by app.py.
     """
     from models import Paragraph
+    import sqlite3
     
     # Extract paragraphs
     paragraphs = extract_paragraphs(text)
@@ -491,7 +492,7 @@ def process_paragraphs(text, document, db_session):
     paragraph_count = 0
     exact_match_count = 0
     
-    for paragraph_text in filtered_paragraphs:
+    for position, paragraph_text in enumerate(filtered_paragraphs):
         # Create hash for efficient lookup
         paragraph_hash = hash_paragraph(paragraph_text)
         
@@ -505,13 +506,32 @@ def process_paragraphs(text, document, db_session):
                 hash=paragraph_hash
             )
             db_session.add(paragraph)
+            db_session.flush()  # Ensure paragraph has an ID
         else:
             exact_match_count += 1
         
         # Associate paragraph with document if not already associated
         if paragraph not in document.paragraphs:
+            # First add the paragraph to the document (creates the association)
             document.paragraphs.append(paragraph)
-            paragraph_count += 1
+            db_session.flush()
+            
+            try:
+                # Get direct database connection to handle position setting
+                connection = db_session.connection().connection
+                cursor = connection.cursor()
+                
+                # Update the position using direct SQL
+                cursor.execute(
+                    "UPDATE document_paragraph SET position = ? WHERE document_id = ? AND paragraph_id = ?",
+                    (position, document.id, paragraph.id)
+                )
+                
+                paragraph_count += 1
+            except Exception as e:
+                logger.error(f"Error setting position: {str(e)}")
+                # Continue processing even if position setting fails
+                paragraph_count += 1
     
     logger.info(f"Document processing complete: {paragraph_count} paragraphs added")
     return paragraph_count

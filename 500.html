@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Server Error{% endblock %}
+
+{% block content %}
+<div class="text-center py-5">
+    <div class="error-icon mb-4">
+        <i class="bi bi-exclamation-triangle display-1 text-danger"></i>
+    </div>
+    
+    <h1>500 - Server Error</h1>
+    <p class="lead text-muted mb-4">Something went wrong on our end. We're working to fix the issue.</p>
+    
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h2 class="h5 mb-3">What you can do:</h2>
+                    <ol class="list-group list-group-flush mb-3">
+                        <li class="list-group-item">
+                            <strong>Refresh the page</strong> - This might resolve temporary issues
+                        </li>
+                        <li class="list-group-item">
+                            <strong>Try again later</strong> - The problem might be fixed soon
+                        </li>
+                        <li class="list-group-item">
+                            <strong>Check the logs</strong> - If you're an administrator, check server logs for details
+                            <div class="mt-2">
+                                <a href="{{ url_for('logs.list') }}" class="btn btn-sm btn-outline-secondary">
+                                    <i class="bi bi-journal-text me-1"></i> View Logs
+                                </a>
+                            </div>
+                        </li>
+                    </ol>
+                    
+                    <a href="{{ url_for('documents.index') }}" class="btn btn-primary w-100">
+                        <i class="bi bi-house-door me-1"></i> Go to Home Page
+                    </a>
+                </div>
+            </div>
+            
+            <div class="alert alert-info">
+                <strong>Error Information:</strong> This error has been logged with a unique ID and will be investigated.
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

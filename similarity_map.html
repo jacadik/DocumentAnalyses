@@ -42,7 +42,7 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2><i class="bi bi-diagram-3 me-2"></i>Document Similarity Map</h2>
     <div>
-        <a href="{{ url_for('documents') }}" class="btn btn-outline-primary me-2">
+        <a href="{{ url_for('documents.list_documents') }}" class="btn btn-outline-primary me-2">
             <i class="bi bi-files me-1"></i> View Documents
         </a>
         <form method="POST" action="{{ url_for('calculate_similarities') }}" class="d-inline-block">
@@ -87,7 +87,7 @@
     </div>
     <h3>Need More Documents</h3>
     <p class="text-muted mb-4">You need at least 2 processed documents to calculate and visualize similarities.</p>
-    <a href="{{ url_for('upload') }}" class="btn btn-primary btn-lg">
+    <a href="{{ url_for('documents.upload') }}" class="btn btn-primary btn-lg">
         <i class="bi bi-upload me-1"></i> Upload Documents
     </a>
 </div>
@@ -158,7 +158,7 @@
                                 {% elif sim.source.file_type == 'docx' %}
                                 <i class="bi bi-file-earmark-word text-primary me-1"></i>
                                 {% endif %}
-                                <a href="{{ url_for('view_document', id=sim.source_id) }}" class="text-truncate d-inline-block" style="max-width: 150px;" title="{{ sim.source.original_filename }}">
+                                <a href="{{ url_for('documents.view_document', id=sim.source_id) }}" class="text-truncate d-inline-block" style="max-width: 150px;" title="{{ sim.source.original_filename }}">
                                     {{ sim.source.original_filename }}
                                 </a>
                             </div>
@@ -171,7 +171,7 @@
                                 {% elif sim.target.file_type == 'docx' %}
                                 <i class="bi bi-file-earmark-word text-primary me-1"></i>
                                 {% endif %}
-                                <a href="{{ url_for('view_document', id=sim.target_id) }}" class="text-truncate d-inline-block" style="max-width: 150px;" title="{{ sim.target.original_filename }}">
+                                <a href="{{ url_for('documents.view_document', id=sim.target_id) }}" class="text-truncate d-inline-block" style="max-width: 150px;" title="{{ sim.target.original_filename }}">
                                     {{ sim.target.original_filename }}
                                 </a>
                             </div>
@@ -212,7 +212,7 @@
                         {% for sim in similarities %}
                         <tr>
                             <td>
-                                <a href="{{ url_for('view_document', id=sim.source_id) }}" class="text-truncate d-inline-block" style="max-width: 200px;">
+                                <a href="{{ url_for('documents.view_document', id=sim.source_id) }}" class="text-truncate d-inline-block" style="max-width: 200px;">
                                     {% if sim.source.file_type == 'pdf' %}
                                     <i class="bi bi-file-earmark-pdf text-danger me-1"></i>
                                     {% elif sim.source.file_type == 'docx' %}
@@ -222,7 +222,7 @@
                                 </a>
                             </td>
                             <td>
-                                <a href="{{ url_for('view_document', id=sim.target_id) }}" class="text-truncate d-inline-block" style="max-width: 200px;">
+                                <a href="{{ url_for('documents.view_document', id=sim.target_id) }}" class="text-truncate d-inline-block" style="max-width: 200px;">
                                     {% if sim.target.file_type == 'pdf' %}
                                     <i class="bi bi-file-earmark-pdf text-danger me-1"></i>
                                     {% elif sim.target.file_type == 'docx' %}
@@ -420,16 +420,32 @@
         function showTooltip(event, d) {
             const [x, y] = d3.pointer(event, document.body);
             
+            // Get connected nodes
+            const connectedLinks = data.links.filter(link => 
+                link.source.id === d.id || link.target.id === d.id);
+            
+            // Format tooltip content
             tooltip.innerHTML = `
-                <div><strong>${d.name}</strong></div>
-                <div>Paragraphs: ${d.paragraphs}</div>
-                <div>Type: ${d.file_type.toUpperCase()}</div>
-                <div class="text-muted small">Click to open document</div>
+                <div class="p-2">
+                    <div class="fw-bold mb-1">${d.name}</div>
+                    <div class="small text-muted">${d.file_type.toUpperCase()}</div>
+                    <div class="d-flex justify-content-between mt-2">
+                        <div class="me-3">
+                            <div class="small text-muted">Paragraphs</div>
+                            <div class="fw-bold">${d.paragraphs}</div>
+                        </div>
+                        <div>
+                            <div class="small text-muted">Connections</div>
+                            <div class="fw-bold">${connectedLinks.length}</div>
+                        </div>
+                    </div>
+                </div>
             `;
             
-            tooltip.style.display = 'block';
-            tooltip.style.left = `${x + 10}px`;
-            tooltip.style.top = `${y - 10}px`;
+            tooltip
+                .style('left', `${x + 10}px`)
+                .style('top', `${y - 10}px`)
+                .style('display', 'block');
         }
         
         function hideTooltip() {
@@ -437,15 +453,14 @@
         }
         
         function nodeClicked(event, d) {
-            window.location.href = `/document/${d.id}`;
+            window.location.href = `/documents/view/${d.id}`;
         }
         
-        // Drag functions
+        // Functions for node dragging
         function dragstarted(event, d) {
             if (!event.active) simulation.alphaTarget(0.3).restart();
             d.fx = d.x;
             d.fy = d.y;
-            hideTooltip();
         }
         
         function dragged(event, d) {

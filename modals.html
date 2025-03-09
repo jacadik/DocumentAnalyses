@@ -1,0 +1,115 @@
+<!-- Confirmation Modal Template -->
+{% macro confirmation_modal(id='confirmationModal', title='Confirm Action', text='Are you sure you want to continue?', confirm_text='Confirm', cancel_text='Cancel', confirm_class='btn-danger') %}
+<div class="modal fade" id="{{ id }}" tabindex="-1" aria-labelledby="{{ id }}Label" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="{{ id }}Label">
+                    <i class="bi bi-exclamation-triangle me-2" aria-hidden="true"></i>{{ title }}
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                {{ text }}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x me-1" aria-hidden="true"></i>{{ cancel_text }}
+                </button>
+                <button type="button" class="btn {{ confirm_class }} btn-confirm">
+                    <i class="bi bi-check me-1" aria-hidden="true"></i>{{ confirm_text }}
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endmacro %}
+
+<!-- Form Modal Template -->
+{% macro form_modal(id, title, form_action, form_method='POST', submit_text='Save', close_text='Cancel') %}
+<div class="modal fade" id="{{ id }}" tabindex="-1" aria-labelledby="{{ id }}Label" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="{{ form_action }}" method="{{ form_method }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="{{ id }}Label">{{ title }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    {{ caller() }}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        {{ close_text }}
+                    </button>
+                    <button type="submit" class="btn btn-primary">{{ submit_text }}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endmacro %}
+
+<!-- Tag Modal Template - Specialized for tag selection -->
+{% macro tag_modal(id='tagModal', title='Manage Tags', form_action='', submit_text='Save Tags') %}
+<div class="modal fade" id="{{ id }}" tabindex="-1" aria-labelledby="{{ id }}Label" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="{{ form_action }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                {{ caller() }}
+                <div class="modal-header">
+                    <h5 class="modal-title" id="{{ id }}Label">
+                        <i class="bi bi-tags me-2" aria-hidden="true"></i>{{ title }}
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Select Tags</label>
+                        <div class="tag-selection" id="{{ id }}-selection">
+                            <!-- Tag checkboxes will be populated here -->
+                            <div class="text-center py-3">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <a href="{{ url_for('tags.list') }}" class="btn btn-sm btn-outline-secondary" target="_blank">
+                                <i class="bi bi-plus me-1" aria-hidden="true"></i> Manage Tags
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-tags me-1" aria-hidden="true"></i>{{ submit_text }}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endmacro %}
+
+<!-- Alert Template for notifications -->
+{% macro alert(type='info', dismissible=true) %}
+<div class="alert alert-{{ type }} {% if dismissible %}alert-dismissible fade show{% endif %}" role="alert">
+    {% if type == 'info' %}
+    <i class="bi bi-info-circle me-2" aria-hidden="true"></i>
+    {% elif type == 'success' %}
+    <i class="bi bi-check-circle me-2" aria-hidden="true"></i>
+    {% elif type == 'warning' %}
+    <i class="bi bi-exclamation-triangle me-2" aria-hidden="true"></i>
+    {% elif type == 'danger' %}
+    <i class="bi bi-exclamation-circle me-2" aria-hidden="true"></i>
+    {% endif %}
+    {{ caller() }}
+    {% if dismissible %}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    {% endif %}
+</div>
+{% endmacro %}

@@ -1,0 +1,152 @@
+{% macro pagination(current_page, total_pages, endpoint, endpoint_params={}, size='md', alignment='center', aria_label='Page navigation') %}
+<nav aria-label="{{ aria_label }}">
+    <ul class="pagination {% if size == 'sm' %}pagination-sm{% elif size == 'lg' %}pagination-lg{% endif %} justify-content-{{ alignment }}">
+        <!-- Previous button -->
+        <li class="page-item {% if current_page == 1 %}disabled{% endif %}">
+            {% if current_page > 1 %}
+                {% set prev_params = endpoint_params.copy() %}
+                {% set _ = prev_params.update({'page': current_page - 1}) %}
+                <a class="page-link" href="{{ url_for(endpoint, **prev_params) }}" aria-label="Previous">
+                    <span aria-hidden="true">&laquo;</span>
+                    <span class="visually-hidden">Previous</span>
+                </a>
+            {% else %}
+                <span class="page-link" aria-label="Previous">
+                    <span aria-hidden="true">&laquo;</span>
+                    <span class="visually-hidden">Previous</span>
+                </span>
+            {% endif %}
+        </li>
+        
+        <!-- First page -->
+        {% if current_page > 3 %}
+            {% set first_params = endpoint_params.copy() %}
+            {% set _ = first_params.update({'page': 1}) %}
+            <li class="page-item">
+                <a class="page-link" href="{{ url_for(endpoint, **first_params) }}">1</a>
+            </li>
+            {% if current_page > 4 %}
+                <li class="page-item disabled">
+                    <span class="page-link">...</span>
+                </li>
+            {% endif %}
+        {% endif %}
+        
+        <!-- Page numbers around current page -->
+        {% for page_num in range(max(1, current_page - 2), min(total_pages + 1, current_page + 3)) %}
+            {% set page_params = endpoint_params.copy() %}
+            {% set _ = page_params.update({'page': page_num}) %}
+            <li class="page-item {% if page_num == current_page %}active{% endif %}">
+                <a class="page-link" href="{{ url_for(endpoint, **page_params) }}">
+                    {{ page_num }}
+                    {% if page_num == current_page %}
+                        <span class="visually-hidden">(current)</span>
+                    {% endif %}
+                </a>
+            </li>
+        {% endfor %}
+        
+        <!-- Last page -->
+        {% if current_page < total_pages - 2 %}
+            {% if current_page < total_pages - 3 %}
+                <li class="page-item disabled">
+                    <span class="page-link">...</span>
+                </li>
+            {% endif %}
+            {% set last_params = endpoint_params.copy() %}
+            {% set _ = last_params.update({'page': total_pages}) %}
+            <li class="page-item">
+                <a class="page-link" href="{{ url_for(endpoint, **last_params) }}">{{ total_pages }}</a>
+            </li>
+        {% endif %}
+        
+        <!-- Next button -->
+        <li class="page-item {% if current_page == total_pages %}disabled{% endif %}">
+            {% if current_page < total_pages %}
+                {% set next_params = endpoint_params.copy() %}
+                {% set _ = next_params.update({'page': current_page + 1}) %}
+                <a class="page-link" href="{{ url_for(endpoint, **next_params) }}" aria-label="Next">
+                    <span aria-hidden="true">&raquo;</span>
+                    <span class="visually-hidden">Next</span>
+                </a>
+            {% else %}
+                <span class="page-link" aria-label="Next">
+                    <span aria-hidden="true">&raquo;</span>
+                    <span class="visually-hidden">Next</span>
+                </span>
+            {% endif %}
+        </li>
+    </ul>
+</nav>
+{% endmacro %}
+
+{% macro pagination_info(current_page, total_pages, per_page, total_items, item_name='item') %}
+<div class="pagination-info text-muted">
+    {% set item_start = ((current_page - 1) * per_page) + 1 %}
+    {% set item_end = min(current_page * per_page, total_items) %}
+    
+    {% if total_items > 0 %}
+        Showing {{ item_start }} to {{ item_end }} of {{ total_items }} {{ item_name }}{% if total_items != 1 %}s{% endif %}
+    {% else %}
+        No {{ item_name }}s found
+    {% endif %}
+</div>
+{% endmacro %}
+
+{% macro pagination_controls(current_page, total_pages, endpoint, endpoint_params={}, with_size_select=false, alignment='between') %}
+<div class="d-flex justify-content-{{ alignment }} align-items-center">
+    <!-- Previous and Next buttons -->
+    <div class="btn-group">
+        {% if current_page > 1 %}
+            {% set prev_params = endpoint_params.copy() %}
+            {% set _ = prev_params.update({'page': current_page - 1}) %}
+            <a href="{{ url_for(endpoint, **prev_params) }}" class="btn btn-outline-primary">
+                <i class="bi bi-arrow-left me-1" aria-hidden="true"></i> Previous
+            </a>
+        {% else %}
+            <button type="button" class="btn btn-outline-primary" disabled>
+                <i class="bi bi-arrow-left me-1" aria-hidden="true"></i> Previous
+            </button>
+        {% endif %}
+        
+        {% if current_page < total_pages %}
+            {% set next_params = endpoint_params.copy() %}
+            {% set _ = next_params.update({'page': current_page + 1}) %}
+            <a href="{{ url_for(endpoint, **next_params) }}" class="btn btn-outline-primary">
+                Next <i class="bi bi-arrow-right ms-1" aria-hidden="true"></i>
+            </a>
+        {% else %}
+            <button type="button" class="btn btn-outline-primary" disabled>
+                Next <i class="bi bi-arrow-right ms-1" aria-hidden="true"></i>
+            </button>
+        {% endif %}
+    </div>
+    
+    <!-- Page info -->
+    <div class="mx-3">
+        Page {{ current_page }} of {{ total_pages }}
+    </div>
+    
+    <!-- Items per page selector -->
+    {% if with_size_select %}
+        <div class="dropdown">
+            {% set per_page = endpoint_params.get('per_page', 10) %}
+            <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="perPageDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                {{ per_page }} per page
+            </button>
+            <ul class="dropdown-menu" aria-labelledby="perPageDropdown">
+                {% for size in [10, 20, 50, 100] %}
+                    {% set size_params = endpoint_params.copy() %}
+                    {% set _ = size_params.update({'per_page': size, 'page': 1}) %}
+                    <li>
+                        <a class="dropdown-item {% if per_page == size %}active{% endif %}" 
+                           href="{{ url_for(endpoint, **size_params) }}">
+                            {{ size }} per page
+                        </a>
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+</div>
+{% endmacro %}

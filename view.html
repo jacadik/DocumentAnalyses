@@ -76,7 +76,7 @@
                 data-doc-name="{{ document.original_filename }}">
             <i class="bi bi-trash me-1"></i> Delete Document
         </button>
-        <a href="{{ url_for('documents') }}" class="btn btn-secondary">
+        <a href="{{ url_for('documents.list_documents') }}" class="btn btn-secondary">
             <i class="bi bi-arrow-left me-1"></i> Back to List
         </a>
     </div>
@@ -186,7 +186,7 @@
                     <nav aria-label="Preview navigation" class="preview-pagination">
                         <ul class="pagination pagination-sm mb-0">
                             <li class="page-item {% if current_page == 1 %}disabled{% endif %}">
-                                <a class="page-link" href="{{ url_for('view_document', id=document.id, page=current_page-1) if current_page > 1 else '#' }}" aria-label="Previous">
+                                <a class="page-link" href="{{ url_for('documents.view_document', id=document.id, page=current_page-1) if current_page > 1 else '#' }}" aria-label="Previous">
                                     <span aria-hidden="true">&laquo;</span>
                                 </a>
                             </li>
@@ -194,7 +194,7 @@
                             {% for page_num in range(1, total_pages + 1) %}
                                 {% if page_num == 1 or page_num == total_pages or (page_num >= current_page - 2 and page_num <= current_page + 2) %}
                                 <li class="page-item {% if page_num == current_page %}active{% endif %}">
-                                    <a class="page-link" href="{{ url_for('view_document', id=document.id, page=page_num) }}">{{ page_num }}</a>
+                                    <a class="page-link" href="{{ url_for('documents.view_document', id=document.id, page=page_num) }}">{{ page_num }}</a>
                                 </li>
                                 {% elif page_num == current_page - 3 or page_num == current_page + 3 %}
                                 <li class="page-item disabled">
@@ -204,7 +204,7 @@
                             {% endfor %}
                             
                             <li class="page-item {% if current_page == total_pages %}disabled{% endif %}">
-                                <a class="page-link" href="{{ url_for('view_document', id=document.id, page=current_page+1) if current_page < total_pages else '#' }}" aria-label="Next">
+                                <a class="page-link" href="{{ url_for('documents.view_document', id=document.id, page=current_page+1) if current_page < total_pages else '#' }}" aria-label="Next">
                                     <span aria-hidden="true">&raquo;</span>
                                 </a>
                             </li>
@@ -231,23 +231,23 @@
             {% if total_pages > 1 %}
             <div class="card-footer bg-light">
                 <div class="d-flex justify-content-between align-items-center">
-                    <a href="{{ url_for('view_document', id=document.id, page=current_page-1) }}" class="btn btn-outline-primary {% if current_page == 1 %}disabled{% endif %}">
+                    <a href="{{ url_for('documents.view_document', id=document.id, page=current_page-1) }}" class="btn btn-outline-primary {% if current_page == 1 %}disabled{% endif %}">
                         <i class="bi bi-arrow-left me-1"></i> Previous
                     </a>
                     <div class="text-center">
                         <div class="btn-group" role="group">
-                            <a href="{{ url_for('view_document', id=document.id, page=1) }}" class="btn btn-outline-secondary {% if current_page == 1 %}disabled{% endif %}">
+                            <a href="{{ url_for('documents.view_document', id=document.id, page=1) }}" class="btn btn-outline-secondary {% if current_page == 1 %}disabled{% endif %}">
                                 <i class="bi bi-chevron-double-left"></i>
                             </a>
                             <button type="button" class="btn btn-outline-secondary">
                                 {{ current_page }} / {{ total_pages }}
                             </button>
-                            <a href="{{ url_for('view_document', id=document.id, page=total_pages) }}" class="btn btn-outline-secondary {% if current_page == total_pages %}disabled{% endif %}">
+                            <a href="{{ url_for('documents.view_document', id=document.id, page=total_pages) }}" class="btn btn-outline-secondary {% if current_page == total_pages %}disabled{% endif %}">
                                 <i class="bi bi-chevron-double-right"></i>
                             </a>
                         </div>
                     </div>
-                    <a href="{{ url_for('view_document', id=document.id, page=current_page+1) }}" class="btn btn-outline-primary {% if current_page == total_pages %}disabled{% endif %}">
+                    <a href="{{ url_for('documents.view_document', id=document.id, page=current_page+1) }}" class="btn btn-outline-primary {% if current_page == total_pages %}disabled{% endif %}">
                         Next <i class="bi bi-arrow-right ms-1"></i>
                     </a>
                 </div>
@@ -290,7 +290,7 @@
                                     {% else %}
                                     <i class="bi bi-file-earmark-text me-1"></i>
                                     {% endif %}
-                                    <a href="{{ url_for('view_document', id=doc.id) }}">{{ doc.original_filename }}</a>
+                                    <a href="{{ url_for('documents.view_document', id=doc.id) }}">{{ doc.original_filename }}</a>
                                 </h6>
                                 <div class="small text-muted">
                                     {{ doc.file_type.upper() }} | {{ doc.paragraph_count }} paragraphs
@@ -370,7 +370,7 @@
                                     <div>
                                         {% for doc in paragraph.documents %}
                                             {% if doc.id != document.id %}
-                                            <a href="{{ url_for('view_document', id=doc.id) }}" class="badge bg-primary text-decoration-none me-1 mb-1">
+                                            <a href="{{ url_for('documents.view_document', id=doc.id) }}" class="badge bg-primary text-decoration-none me-1 mb-1">
                                                 {{ doc.original_filename }}
                                             </a>
                                             {% endif %}
@@ -425,7 +425,7 @@
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                     <i class="bi bi-x me-1"></i> Cancel
                 </button>
-                <form method="POST" action="{{ url_for('delete_document', id=document.id) }}">
+                <form method="POST" action="{{ url_for('documents.delete_document', id=document.id) }}">
                     <button type="submit" class="btn btn-danger">
                         <i class="bi bi-trash me-1"></i> Delete Document
                     </button>
@@ -439,7 +439,7 @@
 <div class="modal fade" id="tagDocumentModal" tabindex="-1" aria-labelledby="tagDocumentModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form method="POST" action="{{ url_for('tag_document', id=document.id) }}">
+            <form method="POST" action="{{ url_for('documents.tag_document', id=document.id) }}">
                 <div class="modal-header">
                     <h5 class="modal-title" id="tagDocumentModalLabel">
                         <i class="bi bi-tags me-2"></i>Manage Document Tags

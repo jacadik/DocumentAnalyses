@@ -1,0 +1,156 @@
+{% macro document_card(document, show_actions=true) %}
+<div class="card document-card h-100">
+    <div class="card-header d-flex align-items-center">
+        <div class="document-icon me-2">
+            {% if document.file_type == 'pdf' %}
+            <i class="bi bi-file-earmark-pdf text-danger fs-4" aria-hidden="true"></i>
+            {% elif document.file_type == 'docx' %}
+            <i class="bi bi-file-earmark-word text-primary fs-4" aria-hidden="true"></i>
+            {% else %}
+            <i class="bi bi-file-earmark-text text-secondary fs-4" aria-hidden="true"></i>
+            {% endif %}
+        </div>
+        <h3 class="h6 mb-0 text-truncate">{{ document.original_filename }}</h3>
+    </div>
+    <div class="card-body">
+        <div class="mb-3">
+            <div class="d-flex justify-content-between mb-1">
+                <span class="text-muted">File Type:</span>
+                <span class="badge bg-secondary">{{ document.file_type.upper() }}</span>
+            </div>
+            <div class="d-flex justify-content-between mb-1">
+                <span class="text-muted">Size:</span>
+                <span>{{ format_file_size(document.file_size) }}</span>
+            </div>
+            <div class="d-flex justify-content-between mb-1">
+                <span class="text-muted">Pages:</span>
+                <span>{{ document.page_count or 'Unknown' }}</span>
+            </div>
+            <div class="d-flex justify-content-between mb-1">
+                <span class="text-muted">Paragraphs:</span>
+                <span>{{ document.paragraph_count or 'Unknown' }}</span>
+            </div>
+            <div class="d-flex justify-content-between">
+                <span class="text-muted">Upload Date:</span>
+                <span>{{ document.upload_date.strftime('%Y-%m-%d') }}</span>
+            </div>
+        </div>
+        
+        <div class="mb-3">
+            <h4 class="h6 mb-2">Status:</h4>
+            {% if document.status == 'processed' %}
+            <div class="alert alert-success py-2 mb-2">
+                <i class="bi bi-check-circle me-1" aria-hidden="true"></i>
+                <span class="fw-medium">Processed</span>
+            </div>
+            {% elif document.status == 'error' %}
+            <div class="alert alert-danger py-2 mb-2">
+                <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+                <span class="fw-medium">Error</span>
+                {% if document.error_message %}
+                <div class="small mt-1">{{ document.error_message }}</div>
+                {% endif %}
+            </div>
+            {% else %}
+            <div class="alert alert-warning py-2 mb-2">
+                <i class="bi bi-hourglass-split me-1" aria-hidden="true"></i>
+                <span class="fw-medium">{{ document.status|capitalize }}</span>
+            </div>
+            {% endif %}
+        </div>
+        
+        {% if document.get_tags() %}
+        <div>
+            <h4 class="h6 mb-2">Tags:</h4>
+            <div>
+                {% for tag in document.get_tags() %}
+                <span class="badge mb-1" style="background-color: {{ tag.color }}">
+                    {{ tag.name }}
+                </span>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    {% if show_actions %}
+    <div class="card-footer">
+        <div class="d-flex justify-content-between">
+            <a href="{{ url_for('documents.view', id=document.id) }}" class="btn btn-primary">
+                <i class="bi bi-eye me-1" aria-hidden="true"></i> View
+            </a>
+            <button type="button" class="btn btn-danger" 
+                    data-bs-toggle="modal" 
+                    data-bs-target="#deleteModal" 
+                    data-modal-id="{{ document.id }}"
+                    data-modal-name="{{ document.original_filename }}">
+                <i class="bi bi-trash" aria-hidden="true"></i>
+            </button>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endmacro %}
+
+{% macro document_list_item(document) %}
+<tr data-search-item data-search-text="{{ document.original_filename }} {{ document.file_type }} {{ document.status }}">
+    <td>{{ document.id }}</td>
+    <td>
+        <div class="d-flex align-items-center">
+            <span class="document-icon me-2">
+                {% if document.file_type == 'pdf' %}
+                <i class="bi bi-file-earmark-pdf text-danger fs-4" aria-hidden="true"></i>
+                {% elif document.file_type == 'docx' %}
+                <i class="bi bi-file-earmark-word text-primary fs-4" aria-hidden="true"></i>
+                {% else %}
+                <i class="bi bi-file-earmark-text text-secondary fs-4" aria-hidden="true"></i>
+                {% endif %}
+            </span>
+            <div>
+                <div class="fw-semibold">{{ document.original_filename }}</div>
+                <small class="text-muted">{{ document.file_type.upper() }}</small>
+            </div>
+        </div>
+    </td>
+    <td>
+        <div><small class="text-muted">Size:</small> {{ format_file_size(document.file_size) }}</div>
+        <div><small class="text-muted">Pages:</small> {{ document.page_count }}</div>
+        <div><small class="text-muted">Paragraphs:</small> {{ document.paragraph_count }}</div>
+    </td>
+    <td>{{ document.upload_date.strftime('%Y-%m-%d %H:%M') }}</td>
+    <td>
+        {% if document.status == 'processed' %}
+        <span class="badge bg-success">
+            <i class="bi bi-check-circle me-1" aria-hidden="true"></i> {{ document.status }}
+        </span>
+        {% elif document.status == 'error' %}
+        <span class="badge bg-danger">
+            <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i> {{ document.status }}
+        </span>
+        {% else %}
+        <span class="badge bg-warning text-dark">
+            <i class="bi bi-hourglass-split me-1" aria-hidden="true"></i> {{ document.status }}
+        </span>
+        {% endif %}
+        {% for tag in document.get_tags() %}
+        <span class="badge mt-1" style="background-color: {{ tag.color }}">
+            <i class="bi bi-tag me-1" aria-hidden="true"></i> {{ tag.name }}
+        </span>
+        {% endfor %}
+    </td>
+    <td>
+        <div class="btn-group">
+            <a href="{{ url_for('documents.view', id=document.id) }}" class="btn btn-sm btn-primary">
+                <i class="bi bi-eye me-1" aria-hidden="true"></i> View
+            </a>
+            <button type="button" class="btn btn-sm btn-danger" 
+                    data-bs-toggle="modal" 
+                    data-bs-target="#deleteModal" 
+                    data-doc-id="{{ document.id }}"
+                    data-doc-name="{{ document.original_filename }}">
+                <i class="bi bi-trash" aria-hidden="true"></i>
+            </button>
+        </div>
+    </td>
+</tr>
+{% endmacro %}

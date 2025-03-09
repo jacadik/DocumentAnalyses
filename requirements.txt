@@ -1,5 +1,6 @@
 Flask==2.2.3
 Flask-SQLAlchemy==3.0.3
+Flask-WTF==1.1.1  # Added for CSRF protection
 PyMuPDF==1.21.1
 python-docx==0.8.11
 pandas==1.5.3
@@ -10,3 +11,6 @@ rapidfuzz==3.0.0
 scikit-learn==1.2.2
 numpy==1.24.3
 Pillow==9.4.0
+email-validator==2.0.0  # Added for form validation
+logging-plus==1.0.0  # Added for enhanced logging
+python-dotenv==1.0.0  # Added for environment variable management
